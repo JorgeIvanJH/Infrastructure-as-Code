@@ -109,15 +109,27 @@ e.g:
 
 ### Format and validate the configuration
 
-The "terraform fmt" command automatically updates configurations in the current directory for readability and consistency.
+The 
+```bash
+terraform fmt
+```
+command automatically updates configurations in the current directory for readability and consistency.
 
-You can also make sure your configuration is syntactically valid and internally consistent by using the terraform validate command.
+You can also make sure your configuration is syntactically valid and internally consistent by using the command:
+
+```bash
+terraform validate
+```
 
 # 5. Apply
 
 ## Create infrastructure
 
-Apply the configuration now with the "terraform apply" command.
+Apply the configuration now with the command:
+
+```bash
+terraform apply
+```
 
 That command will show something like:
 
@@ -206,3 +218,27 @@ When using Terraform in production, we recommend that you use a version control 
 ## Create a new resource
 
 You can create new resources by adding them to your Terraform configuration and running "terraform apply" to provision them.
+
+Note that in [main.tf](learn-terraform-gcp\main.tf) we added a new resource which is a VM called "vm_instance" ("google_compute_instance" "vm_instance"), which uses the previously created VPC network which we called "vpc_network". The presence of the "access_config" block, even without any arguments, gives the VM an external IP address, making it accessible over the internet
+
+## Modify Configuration
+
+Terraform can also make changes to existing resources.
+
+in our example we added "tags = ["web", "dev"]" to our "vm_instance" VM resource. After that we hit
+
+```bash
+terraform apply
+```
+
+## Introduce destructive changes
+
+A destructive change is a change that requires the provider to replace the existing resource rather than updating it. Changing the disk image of your instance is one example of a destructive change.
+
+in this example we changed the image on the VM, then we run again
+
+```bash
+terraform apply
+```
+
+Now it will generate a ".tfstate.backup" file that is an exact snapshot of your previous, working state file before you made the VM image change. **NOTE: Protect this file with the same security as .tfstate file, as it contains sensitive information**
