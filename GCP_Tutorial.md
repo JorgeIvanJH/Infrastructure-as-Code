@@ -292,3 +292,21 @@ terraform apply
 
 and now the previously requested value for *variable "project"* is not requested on terraform plan, but identified automatically.
 
+# Terraform Output values with GCP following [this guide](https://developer.hashicorp.com/terraform/tutorials/gcp-get-started/google-cloud-platform-variables)
+
+
+Output values are used to organize data to be easily queried and displayed to the Terraform user.
+
+When building an infrastructure, Terraform creates far too many attribute values for all the resources created. With outputs one can define what specific values of interest to display.
+
+## Define Outputs
+
+We created [outputs.tf](learn-terraform-gcp/outputs.tf) to define an output variable named "ip" to extract the internal IP address of your deployed Virtual Machine
+
+## Inspect outputs
+
+After applying the new configuratin with output values (using terraform apply), you can see the values of saved outputs by running:
+
+```bash
+terraform output
+```
