@@ -1,8 +1,8 @@
 terraform {
   required_providers {
     google = {
-      source = "registry.terraform.io/hashicorp/google" # path to the provider
-      version = "6.8.0" # versioning recommended instead of latest to avoid breaking changes
+      source  = "registry.terraform.io/hashicorp/google" # path to the provider
+      version = "6.8.0"                                  # versioning recommended instead of latest to avoid breaking changes
     }
   }
 }
