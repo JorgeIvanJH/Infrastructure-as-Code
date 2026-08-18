@@ -242,3 +242,53 @@ terraform apply
 ```
 
 Now it will generate a ".tfstate.backup" file that is an exact snapshot of your previous, working state file before you made the VM image change. **NOTE: Protect this file with the same security as .tfstate file, as it contains sensitive information**
+
+# Terraform Destroy with GCP following [this guide](https://developer.hashicorp.com/terraform/tutorials/gcp-get-started/google-cloud-platform-destroy)
+
+## Destroy Infrastructure
+
+The 
+
+```bash
+terraform destroy
+```
+
+command terminates resources managed by your Terraform project.
+
+This command is the inverse of "terraform apply" in that it terminates all the resources specified in your Terraform state. It does not destroy resources running elsewhere that are not managed by the current Terraform project.
+
+# Terraform input Variables with GCP following [this guide](https://developer.hashicorp.com/terraform/tutorials/gcp-get-started/google-cloud-platform-variables)
+
+
+Terraform configurations can include variables to make your configuration more dynamic and flexible.
+
+## Define input variables
+
+we created [variables.tf](learn-terraform-gcp\variables.tf) with some variable definitions.
+
+*tip: Terraform loads all files ending in .tf in the working directory, so you can name your configuration files however you choose. We recommend defining variables in their own file to make your configuration easier to organize and understand.*
+
+when variables have value they will have them by default, variables without values will be requested during terraform apply and will have to be manually provided
+
+## Use variables in configuration
+
+Next, update the GCP provider configuration in main.tf to use these new variables.
+
+Variables are referenced with the var. prefix. So project = "<PROJECT_ID>" changes to  project = var.project, region  = "us-central1" to  region  = var.region, and so on.
+
+## Assign values to your variables
+
+You can populate variables using values from a file. Terraform automatically loads files called *terraform.tfvars* or matching **.auto.tfvars* in the working directory when running operations.
+
+**Note: Also treat .tfvars as sensitive information in a real production scenario**
+
+in this example, the value for variable *variable "project" { }* in [variables.tf](learn-terraform-gcp/variables.tf) is automatically paired with the value in [terraform.tfvars](learn-terraform-gcp/terraform.tfvars) just because they are names the same (project = "even-lyceum-505816-g5")
+
+With all this at hand, we can:
+
+```bash
+terraform apply
+```
+
+and now the previously requested value for *variable "project"* is not requested on terraform plan, but identified automatically.
+
