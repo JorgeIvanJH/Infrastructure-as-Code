@@ -3,13 +3,6 @@
 # Terraform Build with GCP following [this guide](https://developer.hashicorp.com/terraform/tutorials/gcp-get-started/infrastructure-as-code)
 
 
-## Requirements (GCP):
-
-- chocolatey (win)
-- terraform CLI 
-- gcloud CLI
-- GCP project with enabled Google Compute Engine API
-
 ## To deploy infrastructure with Terraform:
 
 1. Scope - Identify the infrastructure for your project.
