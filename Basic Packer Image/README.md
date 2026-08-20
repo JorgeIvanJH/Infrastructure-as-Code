@@ -4,7 +4,7 @@ Context: Packer creates images that are used to easily run VMs. These images are
 
 
 
-# My first PAcker experience using [this guide](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-build-image), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-provision)
+# My first PAcker experience using [this guide](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-build-image), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-provision), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-variables)
 
 here we create a first image using packer and then a docker container.
 
@@ -45,7 +45,7 @@ A source block has two important labels: a *builder type* and a *name*. In our [
 
 The build block defines what packer should do with the VM after it is launched.
 
-The Packer build block functions as an assembly line, where sources act as the raw material (base OS/machine), provisioners perform the work (installing software/configurations), and post-processors package the finished artifact. This structure turns a generic source into a specialized image, allowing for automated creation, customization, and deployment of virtual machines or containers.
+The Packer build block functions as an assembly line, where **sources** (above) act as the raw material (base OS/machine), **provisioners** perform the work (installing software/configurations), and **post-processors** package the finished artifact. This structure turns a generic source into a specialized image, allowing for automated creation, customization, and deployment of virtual machines or containers.
 
 
 #### Add provisioner to template
@@ -55,6 +55,31 @@ Using provisioners allows you to completely automate modifications to your image
 in one fo the provisioners in our example we add a text file example.txt containing some message.
 
 You can run as many provisioners as you'd like. Provisioners run in the order they are declared.
+
+#### Add post-processor to template
+
+add postprocessors here
+
+### Variables
+
+You can use input variables to serve as parameters for a Packer build, allowing aspects of the build to be customized without altering Packer template. In addition, Packer variables are useful when you want to reference a specific value throughout your template.
+
+Treat Packer variables as constants — you cannot update them during run time.
+
+Find all ways to assign variables [here](https://developer.hashicorp.com/packer/guides/hcl/variables#assigning-variables). The order of ascending precedence is: variable defaults, environment variables, variable file(s), command-line flag
+
+#### Build image with variable file
+
+See [this file](Basic Packer Image\packer_tutorial\example.auto.pkrvars.hcl), it has the variable value assigned to it. And ust because its variable name (docker_image) is the same as defined in [the packer template](packer_tutorial/docker-ubuntu.pkr.hcl) (variable "docker_image") that value is assigned :
+
+```bash
+packer build .
+```
+you can override variable values like this:
+
+```bash
+packer build --var docker_image=ubuntu:focal .
+```
 
 ### Initialize Packer configuration
 
