@@ -4,7 +4,7 @@ Context: Packer creates images that are used to easily run VMs. These images are
 
 
 
-# My first PAcker experience using [this guide](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-build-image)
+# My first PAcker experience using [this guide](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-build-image), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-provision)
 
 here we create a first image using packer and then a docker container.
 
@@ -47,12 +47,14 @@ The build block defines what packer should do with the VM after it is launched.
 
 The Packer build block functions as an assembly line, where sources act as the raw material (base OS/machine), provisioners perform the work (installing software/configurations), and post-processors package the finished artifact. This structure turns a generic source into a specialized image, allowing for automated creation, customization, and deployment of virtual machines or containers.
 
-In this example we only need Sources
 
-
-### Add provisioner to template
+#### Add provisioner to template
 
 Using provisioners allows you to completely automate modifications to your image. You can use shell scripts, file uploads, and integrations with modern configuration management tools such as Chef or Puppet.
+
+in one fo the provisioners in our example we add a text file example.txt containing some message.
+
+You can run as many provisioners as you'd like. Provisioners run in the order they are declared.
 
 ### Initialize Packer configuration
 
