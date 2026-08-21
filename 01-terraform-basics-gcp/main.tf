@@ -1,8 +1,10 @@
 terraform {
+  required_version = ">= 1.0.0"
+
   required_providers {
     google = {
-      source  = "registry.terraform.io/hashicorp/google" # path to the provider
-      version = "6.8.0"                                  # versioning recommended instead of latest to avoid breaking changes
+      source  = "hashicorp/google"
+      version = "6.8.0"
     }
   }
 }
@@ -20,11 +22,11 @@ resource "google_compute_network" "vpc_network" {
 resource "google_compute_instance" "vm_instance" {
   name         = "terraform-instance"
   machine_type = "e2-micro"
-  tags         = ["web", "dev"]
+  tags         = ["learning"]
 
   boot_disk {
     initialize_params {
-      image = "cos-cloud/cos-stable"
+      image = "debian-cloud/debian-12"
       type  = "pd-standard"
       size  = 10
     }
@@ -32,7 +34,13 @@ resource "google_compute_instance" "vm_instance" {
 
   network_interface {
     network = google_compute_network.vpc_network.name
-    access_config {
-    }
+
+    # This gives the VM a public IP. Lesson 2 adds the firewall needed for SSH.
+    access_config {}
+  }
+
+  labels = {
+    managed_by = "terraform"
+    lesson     = "01"
   }
 }

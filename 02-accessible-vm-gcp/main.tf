@@ -1,4 +1,6 @@
 terraform {
+  required_version = ">= 1.0.0"
+
   required_providers {
     google = {
       source  = "hashicorp/google"
@@ -17,7 +19,6 @@ resource "google_compute_network" "vpc_network" {
   name = "accessible-vm-network"
 }
 
-# A public IP alone is not enough: the VPC firewall must permit SSH traffic.
 resource "google_compute_firewall" "allow_ssh" {
   name    = "accessible-vm-allow-ssh"
   network = google_compute_network.vpc_network.name
@@ -27,7 +28,6 @@ resource "google_compute_firewall" "allow_ssh" {
     ports    = ["22"]
   }
 
-  # Limit SSH exposure to the public IP supplied when Terraform is run.
   source_ranges = [var.ssh_source_cidr]
   target_tags   = ["ssh"]
 }
@@ -47,8 +47,11 @@ resource "google_compute_instance" "vm_instance" {
 
   network_interface {
     network = google_compute_network.vpc_network.name
-
-    # An empty access_config requests an ephemeral external IPv4 address.
     access_config {}
+  }
+
+  labels = {
+    managed_by = "terraform"
+    lesson     = "02"
   }
 }
