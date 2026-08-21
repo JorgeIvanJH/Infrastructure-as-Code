@@ -2,3 +2,9 @@
 *.tfstate.backup
 *.terraform
 *.terraform.lock.hcl
+
+tf-packer
+tf-packer.pub
+.terraform/
+*.tfstate
+*.tfstate.*
