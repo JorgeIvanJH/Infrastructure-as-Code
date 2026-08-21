@@ -30,3 +30,49 @@ file provisioner in `images\image.pkr.hcl` copies the host file
 `tf-packer.pub` to `/tmp/tf-packer.pub` inside Packer's temporary Linux build
 instance. The `scripts\setup.sh` script then installs it as
 `/home/terraform/.ssh/authorized_keys`.
+
+## build block 
+
+the build block on [packer's template](learn-terraform-provisioning/images/image.pkr.hcl) copies the ssh's .pub file into the temporary vm and executes the shell script. though packer runs locally in this laptop's CLI, depending on the provider things can run instead on the VM used to create the image, in the case of  provisioner "shell", that one executes in the temporary VM.
+
+## Run and access the Go application
+
+After Terraform creates the VM, connect from the `instances` directory:
+
+```powershell
+terraform output -raw ssh_command
+ssh -i ..\tf-packer terraform@$(terraform output -raw public_ip)
+```
+
+Inside the VM, start the application:
+
+```bash
+cd ~/learn-go-webapp-demo
+go run webapp.go
+```
+
+Keep that SSH terminal open while the application runs. On the local computer,
+get the public IP with `terraform output -raw public_ip`, then open:
+
+```text
+http://PUBLIC_IP:8080
+```
+
+From a second SSH session, verify the application directly on the VM with:
+
+```bash
+curl http://localhost:8080
+```
+
+To keep the application running after closing SSH, start it in the background:
+
+```bash
+nohup go run webapp.go > webapp.log 2>&1 &
+```
+
+Inspect or stop the background application with:
+
+```bash
+cat webapp.log
+pkill -f "go run webapp.go"
+```

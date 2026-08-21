@@ -3,48 +3,48 @@
 
 packer {
   required_plugins {
-    amazon = {
+    googlecompute = {
       version = "~> 1"
-      source  = "github.com/hashicorp/amazon"
+      source  = "github.com/hashicorp/googlecompute"
     }
   }
 }
 
-variable "region" {
+variable "project_id" {
   type    = string
-  default = "us-east-1"
+  default = "even-lyceum-505816-g5"
 }
 
-locals { timestamp = regex_replace(timestamp(), "[- TZ:]", "") }
-
-
-# source blocks are generated from your builders; a source can be referenced in
-# build blocks. A build block runs provisioners and post-processors on a
-# source.
-source "amazon-ebs" "example" {
-  ami_name      = "learn-terraform-packer-${local.timestamp}"
-  instance_type = "t2.micro"
-  region        = var.region
-  source_ami_filter {
-    filters = {
-      name                = "ubuntu/images/*ubuntu-jammy-22.04-amd64-server-*"
-      root-device-type    = "ebs"
-      virtualization-type = "hvm"
-    }
-    most_recent = true
-    owners      = ["099720109477"]
-  }
-  ssh_username = "ubuntu"
+variable "zone" {
+  type    = string
+  default = "us-central1-c"
 }
 
-# a build block invokes sources and runs provisioning steps on them.
+locals {
+  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
+}
+
+source "googlecompute" "example" {
+  project_id              = var.project_id
+  zone                    = var.zone
+  machine_type            = "e2-micro"
+  source_image_family     = "ubuntu-2204-lts"
+  source_image_project_id = ["ubuntu-os-cloud"]
+  ssh_username            = "ubuntu"
+
+  image_name        = "learn-terraform-packer-${local.timestamp}"
+  image_family      = "learn-terraform-packer"
+  image_description = "Ubuntu 22.04 image provisioned by Packer"
+}
+
 build {
-  sources = ["source.amazon-ebs.example"]
+  sources = ["source.googlecompute.example"]
 
   provisioner "file" {
     source      = "../tf-packer.pub"
     destination = "/tmp/tf-packer.pub"
   }
+
   provisioner "shell" {
     script = "../scripts/setup.sh"
   }
