@@ -1,10 +1,12 @@
+Official [Packer documentation](https://developer.hashicorp.com/packer/docs)
+
 The real utility of Packer comes from automated provisioning in order to install and configure software in the machines prior to turning them into images.
 
 Context: Packer creates images that are used to easily run VMs. These images are created with plugins that take packer code and translate to the provider chosen. Think of a plugin like a box containing everything needed to run up an image with software included, so a plugin contains builders and communicators. Builders is the component in a plugin that know how to create a temporary image and create an image out of it, while communicators are the mechanism used to upload files, execute scripts, etc in the machine being created.
 
 
 
-# My first PAcker experience using [this guide](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-build-image), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-provision), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-variables), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-parallel-builds)
+# My first PAcker experience using [this guide](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-build-image), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-provision), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-variables), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-parallel-builds), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-post-processors)
 
 here we create a first image using packer and then a docker container.
 
@@ -58,7 +60,27 @@ You can run as many provisioners as you'd like. Provisioners run in the order th
 
 #### Add post-processor to template
 
-add postprocessors here
+While provisioners are run against an instance while it is running, post-processors run only after Packer saves the instance as an image.
+
+In [our example](packer_tutorial/docker-ubuntu.pkr.hcl) we give names to the created images using *post-processor "docker-tag"* that tag the images after they have been created.
+
+##### Sequential post-processing steps
+
+**sequential "post-processor":** You may add as many post-processors as you want using the post-processor syntax, but each one will start from the original artifact output by the builder, **not the artifact created by a previously declared post-processor**.
+
+**pipelines with "post-processors":** Use the post-processors (note the pluralization) block to create post-processing pipelines where the output of one post-processor becomes the input to another post-processor.
+
+e.g: this would tag your image then push it to Docker Hub.
+
+```json
+  post-processors {
+    post-processor "docker-tag" {
+      repository = "jorgejaramilloherrera98795/packertesting"
+      tags       = ["0.7"]
+    }
+    post-processor "docker-push" {}
+  }
+```
 
 ### Variables
 

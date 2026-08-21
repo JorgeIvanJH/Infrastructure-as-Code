@@ -44,7 +44,25 @@ build {
     inline = ["echo Running $(cat /etc/os-release | grep VERSION= | sed 's/\"//g' | sed 's/VERSION=//g') Docker image."]
   }
 
+  post-processor "docker-tag" {
+    repository = "learn-packer"
+    tags       = ["ubuntu-jammy", "packer-rocks"] # Tag "packer-rocks" first assigned to this image
+    only       = ["docker.ubuntu"]
+  }
 
+  post-processor "docker-tag" {
+    repository = "learn-packer"
+    tags       = ["ubuntu-focal", "packer-rocks"] # Tag "packer-rocks" is stolen from the previous image and assigned to this image
+    only       = ["docker.ubuntu-focal"]
+  }
+
+  post-processors {
+    post-processor "docker-tag" {
+      repository = "jorgejaramilloherrera98795/packertesting"
+      tags       = ["0.7"]
+    }
+    post-processor "docker-push" {}
+  }
 
 }
 
