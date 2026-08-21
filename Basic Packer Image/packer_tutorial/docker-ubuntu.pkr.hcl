@@ -1,9 +1,3 @@
-variable "docker_image" {
-  type    = string
-  default = "ubuntu:jammy"
-}
-
-
 packer {
   required_plugins {
     docker = {
@@ -13,15 +7,27 @@ packer {
   }
 }
 
+variable "docker_image" {
+  type    = string
+  default = "ubuntu:jammy"
+}
+
 source "docker" "ubuntu" { # "builder type" "name"
   image  = var.docker_image
   commit = true
 }
 
+source "docker" "ubuntu-focal" {
+  image  = "ubuntu:focal"
+  commit = true
+}
+
+
 build {
   name = "learn-packer"
   sources = [
-    "source.docker.ubuntu"
+    "source.docker.ubuntu",
+    "source.docker.ubuntu-focal"
   ]
 
   provisioner "shell" {
@@ -33,9 +39,11 @@ build {
       "echo \"FOO is $FOO\" > example.txt",
     ]
   }
+
   provisioner "shell" {
-    inline = ["echo Running ${var.docker_image} Docker image."]
+    inline = ["echo Running $(cat /etc/os-release | grep VERSION= | sed 's/\"//g' | sed 's/VERSION=//g') Docker image."]
   }
+
 
 
 }

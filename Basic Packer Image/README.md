@@ -4,7 +4,7 @@ Context: Packer creates images that are used to easily run VMs. These images are
 
 
 
-# My first PAcker experience using [this guide](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-build-image), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-provision), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-variables)
+# My first PAcker experience using [this guide](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-build-image), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-provision), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-variables), and [this one](https://developer.hashicorp.com/packer/tutorials/docker-get-started/docker-get-started-parallel-builds)
 
 here we create a first image using packer and then a docker container.
 
@@ -81,6 +81,12 @@ you can override variable values like this:
 packer build --var docker_image=ubuntu:focal .
 ```
 
+### Parallel builds
+
+ Packer can create multiple images in parallel, all configured from a single template. For example, Packer can build an Amazon AMI and a VMware virtual machine in parallel provisioned with the same scripts, resulting in near-identical images.
+
+To use parallel builds, create a source then add the source to the sources array in the build block. Your sources do not need to be the same type. 
+
 ### Initialize Packer configuration
 
 Initialize your Packer configuration with
@@ -109,3 +115,5 @@ packer build docker-ubuntu.pkr.hcl
 ```
 
 then you do whatever you need with the image (docker images, docker rmi IMAGE_ID, etc)
+
+
