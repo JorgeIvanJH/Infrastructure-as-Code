@@ -26,7 +26,7 @@ source "googlecompute" "spe_agent" {
   project_id              = var.project_id
   zone                    = var.zone
   machine_type            = "e2-micro"
-  disk_size               = 10
+  disk_size               = 30
   disk_type               = "pd-standard"
   source_image_family     = "ubuntu-2404-lts-amd64"
   source_image_project_id = ["ubuntu-os-cloud"]
