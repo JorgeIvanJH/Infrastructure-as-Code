@@ -9,7 +9,7 @@
 terraform.tfvars
 variables.pkrvars.hcl
 
-# Local SSH keys used by lesson 4
+# Local SSH keys used by the GCP image lessons
 tf-packer
 tf-packer.pub
 

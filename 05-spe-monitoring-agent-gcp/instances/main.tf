@@ -15,19 +15,19 @@ provider "google" {
   zone    = var.zone
 }
 
-# This data source finds the newest image in the "learn-terraform-packer" family, which is created by the Packer build.
+# Find the newest image created by this lesson's Packer build.
 data "google_compute_image" "packer" {
   project = var.project
-  family  = "learn-terraform-packer"
+  family  = "learn-spe-monitoring-agent"
 }
 
 resource "google_compute_network" "vpc" {
-  name                    = "learn-packer-network"
+  name                    = "spe-monitoring-agent-network"
   auto_create_subnetworks = true
 }
 
 resource "google_compute_firewall" "allow_ssh" {
-  name    = "learn-packer-allow-ssh"
+  name    = "spe-monitoring-agent-allow-ssh"
   network = google_compute_network.vpc.name
 
   allow {
@@ -39,41 +39,27 @@ resource "google_compute_firewall" "allow_ssh" {
   target_tags   = ["ssh"]
 }
 
-resource "google_compute_firewall" "allow_web" {
-  name    = "learn-packer-allow-web"
-  network = google_compute_network.vpc.name
-
-  allow {
-    protocol = "tcp"
-    ports    = ["8080"]
-  }
-
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["web"]
-}
-
-resource "google_compute_instance" "web" {
-  name         = "learn-packer"
+resource "google_compute_instance" "agent" {
+  name         = "spe-monitoring-agent"
   machine_type = "e2-micro"
-  tags         = ["ssh", "web"]
+  tags         = ["ssh"]
 
   labels = {
-    purpose = "learning"
-    tool    = "terraform"
+    component  = "spe-agent"
+    managed_by = "terraform"
+    purpose    = "learning"
   }
 
   boot_disk {
     initialize_params {
       image = data.google_compute_image.packer.self_link
-      size  = 0
+      size  = 30
       type  = "pd-standard"
     }
   }
 
   network_interface {
     network = google_compute_network.vpc.name
-
-    # An empty access_config requests an ephemeral public IPv4 address.
     access_config {}
   }
 
@@ -85,15 +71,10 @@ resource "google_compute_instance" "web" {
 
 output "public_ip" {
   description = "Public IPv4 address assigned to the VM."
-  value       = google_compute_instance.web.network_interface[0].access_config[0].nat_ip
+  value       = google_compute_instance.agent.network_interface[0].access_config[0].nat_ip
 }
 
 output "ssh_command" {
   description = "Command that connects with the private half of the baked-in key."
-  value       = "ssh -i ../tf-packer terraform@${google_compute_instance.web.network_interface[0].access_config[0].nat_ip}"
-}
-
-output "app_url" {
-  description = "Web address to open after starting the Go application."
-  value       = "http://${google_compute_instance.web.network_interface[0].access_config[0].nat_ip}:8080"
+  value       = "ssh -i ../tf-packer terraform@${google_compute_instance.agent.network_interface[0].access_config[0].nat_ip}"
 }

@@ -22,6 +22,7 @@ Follow the folders in this order:
 | [02 - Accessible VM on GCP](02-accessible-vm-gcp/) | Public IPs, firewall rules, network tags, and SSH with gcloud. |
 | [03 - Packer basics](03-packer-basics/) | Templates, sources, builds, provisioners, variables, parallel builds, and post-processors using Docker locally. |
 | [04 - Terraform and Packer on GCP](04-terraform-packer-gcp/) | Build a custom GCP image, deploy it with Terraform, connect with SSH, and run a small Go app. |
+| [05 - SPE monitoring agent](05-spe-monitoring-agent-gcp/) | Bake a small Python heartbeat agent and a systemd service into a GCP image. |
 
 Use the [glossary](GLOSSARY.md) when a word is new. Each lesson explains only
 the new ideas, so the same definitions do not need to be repeated everywhere.
