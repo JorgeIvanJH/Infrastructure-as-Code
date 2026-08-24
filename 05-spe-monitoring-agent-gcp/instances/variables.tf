@@ -27,3 +27,16 @@ variable "ssh_source_cidr" {
     error_message = "Use one public IPv4 address with /32, for example 203.0.113.10/32."
   }
 }
+
+variable "rdp_source_cidr" {
+  description = "Public IPv4 address of the laptop running Guacamole, followed by /32."
+  type        = string
+
+  validation {
+    condition = (
+      can(cidrhost(var.rdp_source_cidr, 0)) &&
+      can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/32$", var.rdp_source_cidr))
+    )
+    error_message = "Use one public IPv4 address with /32, for example 203.0.113.10/32."
+  }
+}

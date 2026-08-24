@@ -39,13 +39,26 @@ resource "google_compute_firewall" "allow_ssh" {
   target_tags   = ["ssh"]
 }
 
-resource "google_compute_instance" "agent" {
-  name         = "spe-monitoring-agent"
-  machine_type = "e2-micro"
-  tags         = ["ssh"]
+resource "google_compute_firewall" "allow_rdp_from_gateway" {
+  name    = "spe-allow-rdp-from-gateway"
+  network = google_compute_network.vpc.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["3389"]
+  }
+
+  source_ranges = [var.rdp_source_cidr]
+  target_tags   = ["rdp"]
+}
+
+resource "google_compute_instance" "spe" {
+  name         = "spe-demo-001"
+  machine_type = "e2-medium"
+  tags         = ["ssh", "rdp"]
 
   labels = {
-    component  = "spe-agent"
+    component  = "spe"
     managed_by = "terraform"
     purpose    = "learning"
   }
@@ -71,10 +84,10 @@ resource "google_compute_instance" "agent" {
 
 output "public_ip" {
   description = "Public IPv4 address assigned to the VM."
-  value       = google_compute_instance.agent.network_interface[0].access_config[0].nat_ip
+  value       = google_compute_instance.spe.network_interface[0].access_config[0].nat_ip
 }
 
 output "ssh_command" {
   description = "Command that connects with the private half of the baked-in key."
-  value       = "ssh -i ../tf-packer terraform@${google_compute_instance.agent.network_interface[0].access_config[0].nat_ip}"
+  value       = "ssh -i ../tf-packer terraform@${google_compute_instance.spe.network_interface[0].access_config[0].nat_ip}"
 }

@@ -22,7 +22,7 @@ Follow the folders in this order:
 | [02 - Accessible VM on GCP](02-accessible-vm-gcp/) | Public IPs, firewall rules, network tags, and SSH with gcloud. |
 | [03 - Packer basics](03-packer-basics/) | Templates, sources, builds, provisioners, variables, parallel builds, and post-processors using Docker locally. |
 | [04 - Terraform and Packer on GCP](04-terraform-packer-gcp/) | Build a custom GCP image, deploy it with Terraform, connect with SSH, and run a small Go app. |
-| [05 - SPE monitoring agent](05-spe-monitoring-agent-gcp/) | Bake a small Python heartbeat agent and a systemd service into a GCP image. |
+| [05 - SPE monitoring and graphical access](05-spe-monitoring-agent-gcp/) | Bake a heartbeat agent, XFCE, and xrdp into an SPE image, then reach its desktop through a local Guacamole gateway. |
 
 Use the [glossary](GLOSSARY.md) when a word is new. Each lesson explains only
 the new ideas, so the same definitions do not need to be repeated everywhere.
@@ -34,7 +34,7 @@ Install:
 - [Terraform CLI](https://developer.hashicorp.com/terraform/install)
 - [Packer CLI](https://developer.hashicorp.com/packer/install)
 - [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
-- [Docker Desktop](https://docs.docker.com/desktop/) for lesson 3
+- [Docker Desktop](https://docs.docker.com/desktop/) for lessons 3 and 5
 - Git and an SSH client
 
 You also need a Google Cloud project with billing and the Compute Engine API

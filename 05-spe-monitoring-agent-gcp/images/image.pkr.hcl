@@ -22,10 +22,10 @@ locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
 }
 
-source "googlecompute" "spe_agent" {
+source "googlecompute" "spe" {
   project_id              = var.project_id
   zone                    = var.zone
-  machine_type            = "e2-micro"
+  machine_type            = "e2-medium"
   disk_size               = 30
   disk_type               = "pd-standard"
   source_image_family     = "ubuntu-2404-lts-amd64"
@@ -34,16 +34,16 @@ source "googlecompute" "spe_agent" {
 
   image_name        = "learn-spe-monitoring-agent-${local.timestamp}"
   image_family      = "learn-spe-monitoring-agent"
-  image_description = "Ubuntu 24.04 image with Python 3.12 and the SPE monitoring agent"
+  image_description = "Ubuntu 24.04 SPE image with XFCE, xrdp, Python 3.12, and the monitoring agent"
   image_labels = {
-    component = "spe-agent"
+    component = "spe"
     purpose   = "learning"
     tool      = "packer"
   }
 }
 
 build {
-  sources = ["source.googlecompute.spe_agent"]
+  sources = ["source.googlecompute.spe"]
 
   provisioner "file" {
     source      = "../tf-packer.pub"
