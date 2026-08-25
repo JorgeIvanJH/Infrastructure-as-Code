@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SPE JupyterLab
+Comment=Open the hepatitis example in JupyterLab
+Exec=/usr/local/bin/spe-jupyter
+Icon=applications-science
+Terminal=true
+Categories=Development;Education;

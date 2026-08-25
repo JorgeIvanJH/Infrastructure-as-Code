@@ -7,6 +7,9 @@
             <param name="port">3389</param>
             <param name="security">any</param>
             <param name="ignore-cert">true</param>
+            <!-- Guacamole forwards these credentials to xrdp. -->
+            <param name="username">speuser</param>
+            <param name="password">SPE_DESKTOP_PASSWORD</param>
         </connection>
     </authorize>
 </user-mapping>

@@ -34,7 +34,7 @@ source "googlecompute" "spe" {
 
   image_name        = "learn-spe-monitoring-agent-${local.timestamp}"
   image_family      = "learn-spe-monitoring-agent"
-  image_description = "Ubuntu 24.04 SPE image with XFCE, xrdp, Python 3.12, and the monitoring agent"
+  image_description = "Ubuntu 24.04 SPE image with monitoring, XFCE, JupyterLab, R, and RStudio"
   image_labels = {
     component = "spe"
     purpose   = "learning"
@@ -60,7 +60,56 @@ build {
     destination = "/tmp/spe-monitoring-agent.service"
   }
 
+  provisioner "file" {
+    source      = "../environments/python/requirements.txt"
+    destination = "/tmp/python-requirements.txt"
+  }
+
+  provisioner "file" {
+    source      = "../environments/r/requirements.R"
+    destination = "/tmp/r-requirements.R"
+  }
+
+  provisioner "file" {
+    source      = "../data/hepatitis.csv"
+    destination = "/tmp/hepatitis.csv"
+  }
+
+  provisioner "file" {
+    source      = "../examples/python/read-hepatitis.ipynb"
+    destination = "/tmp/read-hepatitis.ipynb"
+  }
+
+  provisioner "file" {
+    source      = "../examples/r/read-hepatitis.R"
+    destination = "/tmp/read-hepatitis.R"
+  }
+
+  provisioner "file" {
+    source      = "../examples/r/spe-data-lab.Rproj"
+    destination = "/tmp/spe-data-lab.Rproj"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-jupyter"
+    destination = "/tmp/spe-jupyter"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-jupyter.desktop"
+    destination = "/tmp/spe-jupyter.desktop"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-rstudio.desktop"
+    destination = "/tmp/spe-rstudio.desktop"
+  }
+
   provisioner "shell" {
     script = "../scripts/setup.sh"
+  }
+
+  provisioner "shell" {
+    script = "../scripts/setup-data-tools.sh"
   }
 }

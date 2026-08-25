@@ -1,9 +1,9 @@
 services:
-  guacd:
+  guacd: # Handles connections to remote desktops
     image: guacamole/guacd:1.6.0
     restart: unless-stopped
 
-  guacamole:
+  guacamole: # Web application that renders the remote desktop in a browser
     image: guacamole/guacamole:1.6.0
     depends_on:
       - guacd

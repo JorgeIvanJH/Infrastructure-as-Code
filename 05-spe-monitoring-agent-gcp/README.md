@@ -1,4 +1,4 @@
-# Lesson 5: An SPE with monitoring and graphical access
+# Lesson 5: An SPE with monitoring, graphical access, and data tools
 
 This lesson starts with the same Packer and Terraform design as lesson 4:
 
@@ -10,10 +10,11 @@ This lesson starts with the same Packer and Terraform design as lesson 4:
 The final VM is a Secure Processing Environment, or SPE. The monitoring agent
 is one component inside the SPE; it is not the whole VM.
 
-This lesson adds two things to the image:
+This lesson adds three things to the image:
 
 - A small Python monitoring agent managed by systemd.
 - An XFCE desktop that Apache Guacamole can reach through RDP.
+- A data workspace with JupyterLab, RStudio Desktop, and `hepatitis.csv`.
 
 Guacamole runs in Docker on my laptop. It is a web gateway: my browser talks
 to Guacamole, and Guacamole talks to the SPE. I do not connect the browser
@@ -25,10 +26,16 @@ browser -> Guacamole on my laptop -> RDP on port 3389 -> xrdp -> XFCE desktop
                                               `-> SPE in GCP
 
 Python agent -> standard output -> systemd journal -> journalctl
+
+hepatitis.csv -> Jupyter notebook (Python)
+              `-> RStudio project (R)
 ~~~
 
 This is a learning proof of concept. Guacamole is available only on my laptop,
 and the RDP firewall accepts only the public IP address of that laptop.
+
+At the end, I can sign in through Guacamole, see the XFCE desktop, and read the
+same CSV in both a Jupyter notebook and RStudio.
 
 ## What Packer puts in the image
 
@@ -36,6 +43,10 @@ and the RDP firewall accepts only the public IP address of that laptop.
 - A systemd service that starts and restarts the agent.
 - XFCE, a lightweight Linux desktop environment.
 - xrdp and xorgxrdp, which provide an RDP server for the XFCE desktop.
+- JupyterLab and pandas in a separate Python virtual environment.
+- R and the open-source RStudio Desktop application.
+- A small browser for opening JupyterLab inside the XFCE desktop.
+- The hepatitis CSV, an example notebook, and an example RStudio project.
 - `terraform`, the SSH administrator used in these lessons.
 - `speuser`, the end user who signs in to the graphical desktop.
 
@@ -46,16 +57,33 @@ password out of Git, Packer files, Terraform files, and Terraform state.
 
 The Packer build VM and final SPE use `e2-medium`, which has 4 GB of memory.
 XFCE is lightweight, but a graphical desktop needs more memory than the
-`e2-micro` used earlier. The 30 GB boot disk also has room for the desktop
-packages. These resources can cost money.
+`e2-micro` used earlier. Four GB is also enough for this small dataset and the
+learning applications. The 30 GB boot disk has room for the desktop and data
+tools. These resources can cost money.
 
 ## Files in this lesson
 
 ~~~text
 05-spe-monitoring-agent-gcp/
 |-- files/
+|   |-- spe-jupyter
+|   |-- spe-jupyter.desktop
 |   |-- spe-monitoring-agent.py
-|   `-- spe-monitoring-agent.service
+|   |-- spe-monitoring-agent.service
+|   `-- spe-rstudio.desktop
+|-- data/
+|   `-- hepatitis.csv
+|-- environments/
+|   |-- python/
+|   |   `-- requirements.txt
+|   `-- r/
+|       `-- requirements.R
+|-- examples/
+|   |-- python/
+|   |   `-- read-hepatitis.ipynb
+|   `-- r/
+|       |-- read-hepatitis.R
+|       `-- spe-data-lab.Rproj
 |-- gateway/
 |   |-- compose.yaml
 |   `-- user-mapping.xml.example
@@ -67,6 +95,7 @@ packages. These resources can cost money.
 |   |-- variables.tf
 |   `-- terraform.tfvars.example
 |-- scripts/
+|   |-- setup-data-tools.sh
 |   `-- setup.sh
 |-- tf-packer       # local private key; ignored by Git
 `-- tf-packer.pub   # public key copied into the image; ignored by Git
@@ -78,7 +107,36 @@ instructions into RDP.
 
 `gateway/user-mapping.xml.example` is a safe template for the local Guacamole
 login and SPE connection. Its real copy is ignored by Git because it contains
-a local password and the current SPE address.
+the Guacamole password, the `speuser` password, and the current SPE address.
+
+`environments/python/requirements.txt` pins the Python packages installed in
+`/opt/spe-python`. This keeps notebook packages separate from Ubuntu's system
+Python.
+
+There is no single universal R equivalent of `requirements.txt`. For this
+small example, `environments/r/requirements.R` records the minimum R version
+and checks the environment. The R example uses `read.csv()`, which is already
+included with R, so it does not download an extra R package. Later lessons can
+add `install.packages()` calls to this file.
+
+`scripts/setup-data-tools.sh` installs the data applications and builds this
+user-owned workspace in the image:
+
+~~~text
+/home/speuser/spe-data-lab/
+|-- data/hepatitis.csv
+|-- environments/python/requirements.txt
+|-- environments/r/requirements.R
+|-- notebooks/read-hepatitis.ipynb
+`-- r/
+    |-- read-hepatitis.R
+    `-- spe-data-lab.Rproj
+~~~
+
+JupyterLab and RStudio read the same CSV. The example contains 154 data rows
+and 20 columns. Some cells are empty on purpose and appear as missing values.
+The setup script pins the open-source RStudio Desktop installer version so a
+build does not silently change to a different IDE release.
 
 For this small proof of concept, the gateway uses Guacamole's simple XML
 authentication instead of adding a database. Apache describes this as useful
@@ -92,6 +150,8 @@ I need:
 - A GCP project with billing and the Compute Engine API enabled.
 - Docker Desktop running on my laptop for Guacamole.
 - My laptop's current public IPv4 address.
+- Internet access during the Packer build so the temporary VM can reach Ubuntu,
+  PyPI, and Posit's official RStudio download site.
 
 I can check that Docker is ready with:
 
@@ -128,9 +188,11 @@ packer validate -var-file="variables.pkrvars.hcl" .
 packer build -var-file="variables.pkrvars.hcl" .
 ~~~
 
-The temporary Packer VM is an `e2-medium` because installing and checking a
-desktop needs more memory. Packer deletes that temporary VM after a successful
-build. The resulting image stays in GCP and belongs to the
+The temporary Packer VM is an `e2-medium` because installing and checking the
+desktop and data tools needs more memory. The build can take several minutes
+because it downloads JupyterLab, R, RStudio, and a browser.
+Packer deletes the temporary VM after a successful build. The resulting image
+stays in GCP and belongs to the
 `learn-spe-monitoring-agent` image family.
 
 I can see it in the GCP Console under:
@@ -160,8 +222,7 @@ The first firewall rule allows SSH on TCP port 22. The second allows RDP on TCP
 port 3389. Both use `/32`, so they accept one public address instead of the
 whole internet. The RDP rule applies only to the VM with the `rdp` network tag.
 
-If an older version of this lesson is still running, destroy it before creating
-this fresh version. Then run:
+Create the final SPE:
 
 ~~~powershell
 terraform init
@@ -215,12 +276,20 @@ Open `user-mapping.xml` and replace:
 
 - `CHANGE_ME` with a new password for the local Guacamole web page.
 - `SPE_PUBLIC_IP` with the value from the Terraform output.
+- `SPE_DESKTOP_PASSWORD` with the password set by `sudo passwd speuser`.
 
-Because this value is inside XML, avoid the characters `<`, `>`, `&`, and
-quotes in this temporary learning password unless they are correctly escaped.
+These values are inside XML. For this temporary lesson, use passwords that do
+not contain `<`, `>`, `&`, or XML attribute quotes unless those characters are
+correctly escaped.
 
-The template deliberately does not store the `speuser` password. I enter that
-password in the xrdp login screen when I open the desktop.
+This gives the student one visible login. Guacamole checks the `student`
+password, then sends the stored `speuser` credentials to xrdp when the
+connection opens.
+
+This is simple credential forwarding, not true single sign-on. True SSO lets
+both systems trust the same identity provider. Here, Guacamole stores a second
+password in plaintext and submits it for me. I use this only for the local
+learning proof of concept and never commit `user-mapping.xml` to Git.
 
 Start the gateway:
 
@@ -255,16 +324,82 @@ Sign in with:
 - Username: `student`
 - Password: the Guacamole password placed in `user-mapping.xml`
 
-Open **SPE desktop**. At the blue xrdp login screen, use:
-
-- Session: `Xorg`
-- Username: `speuser`
-- Password: the password set with `sudo passwd speuser`
+Open **SPE desktop**. Guacamole sends the stored `speuser` credentials to
+xrdp, so the XFCE desktop should open without asking for a second login.
 
 Guacamole is only the gateway. The XFCE desktop and the end-user session run
 inside the GCP VM.
 
-## 8. Verify the monitoring agent
+## 8. Find the shared data workspace
+
+Inside the XFCE desktop, open **Applications** -> **Terminal Emulator** and run:
+
+~~~bash
+cd ~/spe-data-lab
+find . -maxdepth 2 -type f | sort
+~~~
+
+I should see the CSV, notebook, R script, RStudio project, and both environment
+files. Both tools use this one workspace owned by `speuser`, so I can save
+changes made during the lesson.
+
+## 9. Read the CSV in a Jupyter notebook
+
+From the XFCE application menu, open **Development** -> **SPE JupyterLab**.
+A terminal starts the Jupyter process, then the browser opens inside the SPE.
+
+If the menu entry is not visible yet, run this in the XFCE terminal:
+
+~~~bash
+spe-jupyter
+~~~
+
+Jupyter prints a URL containing a temporary token. If the browser does not
+open automatically, copy the complete `http://127.0.0.1:8888/lab?...` URL from
+the terminal and paste it into the browser inside the XFCE desktop.
+
+In JupyterLab:
+
+1. Open `notebooks`.
+2. Open `read-hepatitis.ipynb`.
+3. Select **Run** -> **Run All Cells**.
+
+The notebook displays the first rows, reports 154 rows and 20 columns, and
+counts the missing values. `pandas.read_csv()` performs the CSV read.
+
+Jupyter listens on `127.0.0.1` inside the SPE. It is not exposed through a new
+GCP firewall rule. Remember that this is different from `127.0.0.1:8081` on
+the laptop, where Guacamole runs.
+
+To stop Jupyter, return to its terminal, press `Ctrl+C`, and confirm with `y`.
+Closing only the browser tab does not stop the Jupyter process.
+
+## 10. Read the CSV in RStudio
+
+From the XFCE application menu, open **Development** -> **SPE RStudio Data
+Lab**. The launcher opens the prepared `spe-data-lab.Rproj` project.
+It disables GPU acceleration because this graphical session is rendered over
+xrdp rather than by a physical GPU.
+
+If the menu entry is not visible, run this in the XFCE terminal:
+
+~~~bash
+rstudio --disable-gpu ~/spe-data-lab/r/spe-data-lab.Rproj
+~~~
+
+In RStudio:
+
+1. Open `read-hepatitis.R` from the **Files** pane.
+2. Click **Source** above the script.
+3. Look at the Console output.
+4. Select the `hepatitis` object in the **Environment** pane to reopen the
+   spreadsheet-style data viewer if needed.
+
+The script uses base R's `read.csv()` function. It reports 154 rows and 20
+columns, prints the first rows, counts missing values, and opens the data
+viewer. No additional R package is needed for this first example.
+
+## 11. Verify the monitoring agent
 
 The graphical additions do not change the heartbeat. Through SSH, run:
 
@@ -281,7 +416,7 @@ Every 30 seconds, the journal should show a heartbeat like:
 
 Press `Ctrl+C` to stop following the journal. This does not stop the agent.
 
-## 9. Check automatic startup
+## 12. Check automatic startup
 
 Reboot the SPE from SSH:
 
@@ -347,6 +482,44 @@ If xrdp rejects the login, reconnect with SSH and set the password again:
 sudo passwd speuser
 ~~~
 
+Then place the same new password in the `password` connection parameter in
+`gateway/user-mapping.xml`. Guacamole reloads changes to this file
+automatically. Close the failed connection and open **SPE desktop** again.
+
+If the blue xrdp login screen still appears, check that the connection contains
+both of these parameters and that the password is current:
+
+~~~xml
+<param name="username">speuser</param>
+<param name="password">SPE_DESKTOP_PASSWORD</param>
+~~~
+
+If JupyterLab does not start, open the XFCE terminal and run:
+
+~~~bash
+/opt/spe-python/bin/jupyter lab --version
+/opt/spe-python/bin/python -c "import pandas; print(pandas.__version__)"
+spe-jupyter
+~~~
+
+Keep the terminal open while using JupyterLab. If it prints an address instead
+of opening the browser, copy the complete address into the browser inside the
+SPE desktop.
+
+If RStudio does not start, check R and RStudio from the XFCE terminal:
+
+~~~bash
+R --version
+rstudio --version
+rstudio --disable-gpu ~/spe-data-lab/r/spe-data-lab.Rproj
+~~~
+
+If either tool says the CSV is missing, verify that this exact file exists:
+
+~~~bash
+ls -l ~/spe-data-lab/data/hepatitis.csv
+~~~
+
 ## Cleanup
 
 Stop the local gateway from the `gateway` folder:
@@ -369,7 +542,8 @@ Terraform does not delete the Packer image. Delete the
 ## Security boundaries in this lesson
 
 - No private SSH key or desktop password is stored in the image.
-- The real `user-mapping.xml` is ignored by Git.
+- The real `user-mapping.xml` stores both passwords in plaintext on the laptop
+  so Guacamole can forward the desktop credentials. It is ignored by Git.
 - Guacamole listens only on the laptop's loopback address, not the local
   network or public internet.
 - GCP allows RDP only from `rdp_source_cidr`, not `0.0.0.0/0`.
@@ -379,12 +553,21 @@ Terraform does not delete the Packer image. Delete the
   identity management.
 - Guacamole's XML authentication is for this local proof of concept, not a
   public or production gateway.
+- JupyterLab listens only inside the VM on `127.0.0.1`; port 8888 is not opened
+  in the GCP firewall.
+- Packer stores `hepatitis.csv` in the reusable image. Every VM made from that
+  image receives a copy. Only use learning data here; never bake confidential,
+  identifiable patient, credential, or secret data into an image.
 
 ## Remember
 
 - The SPE is the VM. The monitoring agent is one service inside it.
 - XFCE draws the Linux desktop; xrdp exposes it through RDP.
 - Guacamole changes RDP into a browser-accessible experience.
+- JupyterLab and RStudio are applications inside the SPE desktop, not services
+  exposed to the internet.
+- Both examples read one shared CSV from `~/spe-data-lab/data`.
+- Python packages live in `/opt/spe-python`; R uses its base CSV functions.
 - Packer installs the reusable software. Terraform creates the network,
   firewall rules, and final SPE.
 - A runtime password is safer than baking one into a reusable image.
@@ -399,3 +582,8 @@ Terraform does not delete the Packer image. Delete the
 - [Ubuntu 24.04 XFCE package](https://packages.ubuntu.com/noble/all/xfce4)
 - [Ubuntu 24.04 xrdp package](https://packages.ubuntu.com/noble/xrdp)
 - [Google Cloud VPC firewall rules](https://cloud.google.com/firewall/docs/firewalls)
+- [JupyterLab installation and startup](https://jupyterlab.readthedocs.io/en/stable/getting_started/installation.html)
+- [Python virtual environments](https://docs.python.org/3/library/venv.html)
+- [pandas CSV reader](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html)
+- [RStudio Desktop downloads](https://docs.posit.co/ide/user/)
+- [R `read.csv()` documentation](https://stat.ethz.ch/R-manual/R-devel/library/utils/html/read.table.html)
