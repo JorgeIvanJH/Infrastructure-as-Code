@@ -105,11 +105,35 @@ build {
     destination = "/tmp/spe-rstudio.desktop"
   }
 
+  provisioner "file" {
+    source      = "../files/spe-internet"
+    destination = "/tmp/spe-internet"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-internet-disabled.nft"
+    destination = "/tmp/spe-internet-disabled.nft"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-internet-allowlist.nft"
+    destination = "/tmp/spe-internet-allowlist.nft"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-internet-restore.service"
+    destination = "/tmp/spe-internet-restore.service"
+  }
+
   provisioner "shell" {
     script = "../scripts/setup.sh"
   }
 
   provisioner "shell" {
     script = "../scripts/setup-data-tools.sh"
+  }
+
+  provisioner "shell" {
+    script = "../scripts/setup-internet-control.sh"
   }
 }

@@ -1,4 +1,4 @@
-# Lesson 5: An SPE with monitoring, graphical access, and data tools
+# Lesson 5: An SPE with monitoring, a desktop, data tools, and internet control
 
 This lesson starts with the same Packer and Terraform design as lesson 4:
 
@@ -10,11 +10,12 @@ This lesson starts with the same Packer and Terraform design as lesson 4:
 The final VM is a Secure Processing Environment, or SPE. The monitoring agent
 is one component inside the SPE; it is not the whole VM.
 
-This lesson adds three things to the image:
+This lesson adds four things to the image:
 
 - A small Python monitoring agent managed by systemd.
 - An XFCE desktop that Apache Guacamole can reach through RDP.
 - A data workspace with JupyterLab, RStudio Desktop, and `hepatitis.csv`.
+- A small administrator command for controlling new outbound internet access.
 
 Guacamole runs in Docker on my laptop. It is a web gateway: my browser talks
 to Guacamole, and Guacamole talks to the SPE. I do not connect the browser
@@ -29,13 +30,15 @@ Python agent -> standard output -> systemd journal -> journalctl
 
 hepatitis.csv -> Jupyter notebook (Python)
               `-> RStudio project (R)
+
+administrator -> spe-internet on|off|status -> Linux nftables output rules
 ~~~
 
 This is a learning proof of concept. Guacamole is available only on my laptop,
 and the RDP firewall accepts only the public IP address of that laptop.
 
-At the end, I can sign in through Guacamole, see the XFCE desktop, and read the
-same CSV in both a Jupyter notebook and RStudio.
+At the end, I can sign in through Guacamole, read the same CSV in a Jupyter
+notebook and RStudio, and control new outbound internet connections.
 
 ## What Packer puts in the image
 
@@ -47,6 +50,8 @@ same CSV in both a Jupyter notebook and RStudio.
 - R and the open-source RStudio Desktop application.
 - A small browser for opening JupyterLab inside the XFCE desktop.
 - The hepatitis CSV, an example notebook, and an example RStudio project.
+- `nftables` and the `spe-internet` administrator command.
+- A systemd service that restores the selected internet mode after reboot.
 - `terraform`, the SSH administrator used in these lessons.
 - `speuser`, the end user who signs in to the graphical desktop.
 
@@ -68,6 +73,10 @@ tools. These resources can cost money.
 |-- files/
 |   |-- spe-jupyter
 |   |-- spe-jupyter.desktop
+|   |-- spe-internet
+|   |-- spe-internet-allowlist.nft
+|   |-- spe-internet-disabled.nft
+|   |-- spe-internet-restore.service
 |   |-- spe-monitoring-agent.py
 |   |-- spe-monitoring-agent.service
 |   `-- spe-rstudio.desktop
@@ -96,6 +105,7 @@ tools. These resources can cost money.
 |   `-- terraform.tfvars.example
 |-- scripts/
 |   |-- setup-data-tools.sh
+|   |-- setup-internet-control.sh
 |   `-- setup.sh
 |-- tf-packer       # local private key; ignored by Git
 `-- tf-packer.pub   # public key copied into the image; ignored by Git
@@ -137,6 +147,12 @@ JupyterLab and RStudio read the same CSV. The example contains 154 data rows
 and 20 columns. Some cells are empty on purpose and appear as missing values.
 The setup script pins the open-source RStudio Desktop installer version so a
 build does not silently change to a different IDE release.
+
+`files/spe-internet` is the small administrator command. It manages only the
+`inet spe_egress` nftables table, so it does not replace or flush unrelated
+firewall rules. `files/spe-internet-disabled.nft` contains the restricted
+outbound policy. `files/spe-internet-allowlist.nft` is empty in this lesson and
+provides one clear place for a future control-layer exception.
 
 For this small proof of concept, the gateway uses Guacamole's simple XML
 authentication instead of adding a database. Apache describes this as useful
@@ -194,6 +210,10 @@ because it downloads JupyterLab, R, RStudio, and a browser.
 Packer deletes the temporary VM after a successful build. The resulting image
 stays in GCP and belongs to the
 `learn-spe-monitoring-agent` image family.
+
+The final Packer provisioner also tests this lesson's internet command. It
+turns access off, confirms a new HTTPS request fails while Packer's SSH session
+remains connected, turns access on, and confirms HTTPS works again.
 
 I can see it in the GCP Console under:
 
@@ -399,7 +419,80 @@ The script uses base R's `read.csv()` function. It reports 154 rows and 20
 columns, prints the first rows, counts missing values, and opens the data
 viewer. No additional R package is needed for this first example.
 
-## 11. Verify the monitoring agent
+## 11. Control outbound internet access
+
+The SPE starts with internet access enabled. Through SSH, confirm the current
+mode and make a new request:
+
+~~~bash
+sudo spe-internet status
+curl --head --connect-timeout 5 https://example.com
+~~~
+
+The status should say `Internet access: enabled`, and `curl` should return HTTP
+headers. Now disable new general outbound connections:
+
+~~~bash
+sudo spe-internet off
+sudo spe-internet status
+curl --head --connect-timeout 5 https://example.com
+~~~
+
+The status should say `Internet access: disabled`, and the new `curl` request
+should fail. The current SSH connection remains open because reply traffic is
+allowed. To make the management test stronger, I open a second PowerShell
+window on my laptop and run the Terraform SSH output again. A new inbound SSH
+connection should still work:
+
+~~~powershell
+terraform output -raw ssh_command
+~~~
+
+Enable outbound internet access again and repeat the request:
+
+~~~bash
+sudo spe-internet on
+sudo spe-internet status
+curl --head --connect-timeout 5 https://example.com
+~~~
+
+To prove that the selected mode survives reboot, I disable it, reboot, and
+reconnect from the laptop:
+
+~~~bash
+sudo spe-internet off
+sudo reboot
+~~~
+
+After reconnecting through SSH:
+
+~~~bash
+sudo spe-internet status
+curl --head --connect-timeout 5 https://example.com
+~~~
+
+The status should show effective mode `disabled` and saved mode `off`, and the
+request should fail. I can finish the exercise online with:
+
+~~~bash
+sudo spe-internet on
+~~~
+
+The disabled policy still allows loopback traffic, replies belonging to SSH or
+RDP connections, DHCP renewal, and GCP's metadata address
+`169.254.169.254`. It does not change Terraform's inbound GCP firewall rules.
+
+For a future control-layer proof of concept, an administrator can place a
+narrow nftables rule in `/etc/spe-internet/allowlist.nft`, for example one
+fixed IPv4 address and TCP port. Running `sudo spe-internet off` validates and
+atomically reapplies the policy. This lesson does not add such an exception or
+the external service yet.
+
+There is no Terraform variable for this mode. Every new SPE starts online, and
+the command manages its runtime state from then on. This avoids making every
+`terraform apply` overwrite an administrator's saved choice.
+
+## 12. Verify the monitoring agent
 
 The graphical additions do not change the heartbeat. Through SSH, run:
 
@@ -416,7 +509,7 @@ Every 30 seconds, the journal should show a heartbeat like:
 
 Press `Ctrl+C` to stop following the journal. This does not stop the agent.
 
-## 12. Check automatic startup
+## 13. Check automatic startup
 
 Reboot the SPE from SSH:
 
@@ -429,10 +522,11 @@ After it starts again, reconnect through SSH and verify:
 ~~~bash
 sudo systemctl is-active xrdp
 sudo systemctl is-active spe-monitoring-agent
+sudo systemctl is-active spe-internet-restore
 ~~~
 
-Both services should say `active`. The desktop password remains on the VM, so
-the same Guacamole connection works after a normal reboot.
+All three services should say `active`. The desktop password remains on the
+VM, so the same Guacamole connection works after a normal reboot.
 
 ## Troubleshooting
 
@@ -520,6 +614,23 @@ If either tool says the CSV is missing, verify that this exact file exists:
 ls -l ~/spe-data-lab/data/hepatitis.csv
 ~~~
 
+If `spe-internet off` reports a rule error, inspect the dedicated rules and
+allow-list files. The command checks them before replacing an active policy:
+
+~~~bash
+sudo nft --check --file /etc/spe-internet/disabled.nft
+sudo cat /etc/spe-internet/allowlist.nft
+sudo spe-internet status
+~~~
+
+If the effective and saved modes do not match after an unexpected manual
+firewall change, restore the saved choice with:
+
+~~~bash
+sudo systemctl restart spe-internet-restore
+sudo spe-internet status
+~~~
+
 ## Cleanup
 
 Stop the local gateway from the `gateway` folder:
@@ -558,6 +669,15 @@ Terraform does not delete the Packer image. Delete the
 - Packer stores `hepatitis.csv` in the reusable image. Every VM made from that
   image receives a copy. Only use learning data here; never bake confidential,
   identifiable patient, credential, or secret data into an image.
+- Internet mode `off` blocks new general outbound connections inside the guest
+  operating system. It does not terminate connections that were already open.
+- The policy deliberately keeps GCP's metadata address reachable for the guest
+  environment. This is useful for VM health, but it means `off` is not complete
+  network isolation.
+- A root administrator can change or bypass a firewall inside the VM. A
+  production boundary should also use centrally managed cloud egress controls.
+- This proof of concept owns one nftables table. Do not add another service
+  that flushes the full nftables ruleset without first integrating the two.
 
 ## Remember
 
@@ -568,6 +688,9 @@ Terraform does not delete the Packer image. Delete the
   exposed to the internet.
 - Both examples read one shared CSV from `~/spe-data-lab/data`.
 - Python packages live in `/opt/spe-python`; R uses its base CSV functions.
+- `spe-internet` controls new outbound connections without changing inbound
+  SSH or RDP rules.
+- The saved internet mode is reapplied by systemd after reboot.
 - Packer installs the reusable software. Terraform creates the network,
   firewall rules, and final SPE.
 - A runtime password is safer than baking one into a reusable image.
@@ -587,3 +710,6 @@ Terraform does not delete the Packer image. Delete the
 - [pandas CSV reader](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html)
 - [RStudio Desktop downloads](https://docs.posit.co/ide/user/)
 - [R `read.csv()` documentation](https://stat.ethz.ch/R-manual/R-devel/library/utils/html/read.table.html)
+- [nftables scripting](https://wiki.netfilter.org/wiki-nftables/index.php/Scripting)
+- [nftables command reference](https://netfilter.org/projects/nftables/manpage.html)
+- [GCP metadata server](https://cloud.google.com/compute/docs/metadata/querying-metadata)
