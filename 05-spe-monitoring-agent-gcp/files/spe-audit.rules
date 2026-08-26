@@ -1,0 +1,5 @@
+# Record programs started by signed-in human users.
+# Login, logout, and authentication records are produced by the audit system
+# itself, so they do not need an extra rule here.
+-a always,exit -F arch=b64 -S execve,execveat -F auid>=1000 -F auid!=unset -k spe_cli
+-a always,exit -F arch=b32 -S execve,execveat -F auid>=1000 -F auid!=unset -k spe_cli

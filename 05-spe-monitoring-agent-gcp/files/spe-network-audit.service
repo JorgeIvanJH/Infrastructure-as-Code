@@ -1,0 +1,25 @@
+[Unit]
+Description=SPE local network connection auditing
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=_laurel
+Group=_laurel
+WorkingDirectory=/var/log/spe-audit
+ExecStart=/usr/local/sbin/spe-network-audit
+Restart=on-failure
+RestartSec=5
+UMask=0027
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/spe-audit
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK AF_PACKET
+
+[Install]
+WantedBy=multi-user.target

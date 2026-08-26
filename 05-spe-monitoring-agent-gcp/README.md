@@ -1,4 +1,4 @@
-# Lesson 5: An SPE with monitoring, a desktop, data tools, and internet control
+# Lesson 5: A complete learning SPE
 
 This lesson starts with the same Packer and Terraform design as lesson 4:
 
@@ -10,12 +10,13 @@ This lesson starts with the same Packer and Terraform design as lesson 4:
 The final VM is a Secure Processing Environment, or SPE. The monitoring agent
 is one component inside the SPE; it is not the whole VM.
 
-This lesson adds four things to the image:
+This lesson adds five things to the image:
 
 - A small Python monitoring agent managed by systemd.
 - An XFCE desktop that Apache Guacamole can reach through RDP.
 - A data workspace with JupyterLab, RStudio Desktop, and `hepatitis.csv`.
 - A small administrator command for controlling new outbound internet access.
+- Local operating-system and network audit logs in JSON Lines format.
 
 Guacamole runs in Docker on my laptop. It is a web gateway: my browser talks
 to Guacamole, and Guacamole talks to the SPE. I do not connect the browser
@@ -32,13 +33,17 @@ hepatitis.csv -> Jupyter notebook (Python)
               `-> RStudio project (R)
 
 administrator -> spe-internet on|off|status -> Linux nftables output rules
+
+login + programs + terminal input -> auditd -> Laurel -> os.jsonl
+network connection metadata       -> Zeek             -> network.jsonl
 ~~~
 
 This is a learning proof of concept. Guacamole is available only on my laptop,
 and the RDP firewall accepts only the public IP address of that laptop.
 
 At the end, I can sign in through Guacamole, read the same CSV in a Jupyter
-notebook and RStudio, and control new outbound internet connections.
+notebook and RStudio, control new outbound internet connections, and inspect
+the SPE's local audit trail.
 
 ## What Packer puts in the image
 
@@ -52,6 +57,10 @@ notebook and RStudio, and control new outbound internet connections.
 - The hepatitis CSV, an example notebook, and an example RStudio project.
 - `nftables` and the `spe-internet` administrator command.
 - A systemd service that restores the selected internet mode after reboot.
+- auditd and `pam_tty_audit` for logins, programs, and terminal input.
+- Laurel for readable operating-system events in `os.jsonl`.
+- Zeek for connection metadata in `network.jsonl`.
+- Local log rotation for both JSONL outputs.
 - `terraform`, the SSH administrator used in these lessons.
 - `speuser`, the end user who signs in to the graphical desktop.
 
@@ -77,6 +86,13 @@ tools. These resources can cost money.
 |   |-- spe-internet-allowlist.nft
 |   |-- spe-internet-disabled.nft
 |   |-- spe-internet-restore.service
+|   |-- spe-audit-logrotate
+|   |-- spe-audit.rules
+|   |-- spe-laurel.toml
+|   |-- spe-network-audit
+|   |-- spe-network-audit.service
+|   |-- spe-network-audit.zeek
+|   |-- spe-pam-tty-audit
 |   |-- spe-monitoring-agent.py
 |   |-- spe-monitoring-agent.service
 |   `-- spe-rstudio.desktop
@@ -104,6 +120,7 @@ tools. These resources can cost money.
 |   |-- variables.tf
 |   `-- terraform.tfvars.example
 |-- scripts/
+|   |-- setup-auditing.sh
 |   |-- setup-data-tools.sh
 |   |-- setup-internet-control.sh
 |   `-- setup.sh
@@ -154,6 +171,18 @@ firewall rules. `files/spe-internet-disabled.nft` contains the restricted
 outbound policy. `files/spe-internet-allowlist.nft` is empty in this lesson and
 provides one clear place for a future control-layer exception.
 
+`files/spe-audit.rules` tells Linux Audit to record programs started by signed-
+in users. `files/spe-pam-tty-audit` adds raw interactive terminal input so a
+shell built-in such as `cd` is also visible. `files/spe-laurel.toml` converts
+those audit events into `/var/log/spe-audit/os.jsonl`.
+
+`files/spe-network-audit.zeek` asks Zeek to keep only connection summaries:
+addresses, ports, protocol, duration, state, packet counts, and byte counts.
+The small `spe-network-audit` launcher finds the VM's default network
+interface. Its systemd service writes `/var/log/spe-audit/network.log`; the
+friendlier `network.jsonl` name is a link to that file. `spe-audit-logrotate`
+keeps the network output bounded, while Laurel rotates its own output.
+
 For this small proof of concept, the gateway uses Guacamole's simple XML
 authentication instead of adding a database. Apache describes this as useful
 for small setup checks, not as a production authentication design.
@@ -167,7 +196,8 @@ I need:
 - Docker Desktop running on my laptop for Guacamole.
 - My laptop's current public IPv4 address.
 - Internet access during the Packer build so the temporary VM can reach Ubuntu,
-  PyPI, and Posit's official RStudio download site.
+  PyPI, Posit's official RStudio download site, and the official Zeek package
+  repository.
 
 I can check that Docker is ready with:
 
@@ -206,7 +236,7 @@ packer build -var-file="variables.pkrvars.hcl" .
 
 The temporary Packer VM is an `e2-medium` because installing and checking the
 desktop and data tools needs more memory. The build can take several minutes
-because it downloads JupyterLab, R, RStudio, and a browser.
+because it downloads JupyterLab, R, RStudio, a browser, and Zeek.
 Packer deletes the temporary VM after a successful build. The resulting image
 stays in GCP and belongs to the
 `learn-spe-monitoring-agent` image family.
@@ -492,7 +522,99 @@ There is no Terraform variable for this mode. Every new SPE starts online, and
 the command manages its runtime state from then on. This avoids making every
 `terraform apply` overwrite an administrator's saved choice.
 
-## 12. Verify the monitoring agent
+## 12. Verify local auditing
+
+The two audit outputs are:
+
+~~~text
+/var/log/spe-audit/os.jsonl       login, logout, programs, and terminal input
+/var/log/spe-audit/network.jsonl  network connection summaries
+~~~
+
+Each line is one JSON object. The files are not writable by `speuser`. I use
+the `terraform` administrator and `sudo` to inspect them.
+
+First, check the collectors through SSH:
+
+~~~bash
+sudo systemctl is-active auditd
+sudo systemctl is-active spe-network-audit
+sudo pgrep --list-full laurel
+~~~
+
+All three checks should show a running collector. Laurel runs as an auditd
+plug-in, so it does not have a separate systemd service.
+
+Now create a small, easy-to-recognize trail as the researcher:
+
+1. Sign in to **SPE desktop** through Guacamole as described above.
+2. Open **Terminal Emulator**.
+3. Run a shell built-in and a few external programs:
+
+~~~bash
+cd ~/spe-data-lab
+pwd
+python3 --version
+curl --head --connect-timeout 5 https://example.com
+~~~
+
+`cd` is a shell built-in, so no new program starts for that command. Its raw
+terminal input is covered by `pam_tty_audit`. The other commands are programs
+and are covered by the `execve` audit rules. The `curl` request also creates a
+network connection for Zeek to summarize.
+
+Close the terminal and use the XFCE menu to log out of the desktop. This ends
+the researcher session and creates the logout event. Reconnect through SSH as
+the `terraform` administrator and inspect the records:
+
+~~~bash
+sudo jq 'select(.USER_LOGIN or .USER_START or .USER_END or .USER_LOGOUT)' \
+  /var/log/spe-audit/os.jsonl
+sudo jq 'select(.EXECVE)' /var/log/spe-audit/os.jsonl
+sudo jq 'select(.TTY)' /var/log/spe-audit/os.jsonl
+sudo tail -n 10 /var/log/spe-audit/network.jsonl | jq .
+~~~
+
+The exact login field depends on the program that opened the session. I should
+see login/start and end/logout records, `EXECVE.ARGV` arrays for external
+programs, a `TTY.data` value containing the terminal input, and a network JSON
+object similar to:
+
+~~~json
+{"ts":1787754601.25,"uid":"Cexample123","id.orig_h":"10.0.0.2","id.orig_p":43210,"id.resp_h":"93.184.216.34","id.resp_p":443,"proto":"tcp","duration":0.12,"orig_bytes":80,"resp_bytes":300,"conn_state":"SF","orig_pkts":6,"resp_pkts":5,"orig_ip_bytes":400,"resp_ip_bytes":560}
+~~~
+
+Zeek writes a connection summary when the connection closes or expires, so a
+still-open connection may not appear immediately. I can follow new events in
+two SSH windows:
+
+~~~bash
+sudo tail -F /var/log/spe-audit/os.jsonl | jq --unbuffered .
+sudo tail -F /var/log/spe-audit/network.jsonl | jq --unbuffered .
+~~~
+
+Press `Ctrl+C` to stop following a file. This does not stop collection.
+
+Finally, reboot and confirm collection resumes automatically:
+
+~~~bash
+sudo reboot
+~~~
+
+After reconnecting:
+
+~~~bash
+sudo systemctl is-active auditd
+sudo systemctl is-active spe-network-audit
+sudo tail -n 1 /var/log/spe-audit/os.jsonl | jq .
+sudo tail -n 1 /var/log/spe-audit/network.jsonl | jq .
+~~~
+
+Laurel rotates `os.jsonl` at 10 MB and keeps five older files. `logrotate` does
+the same for Zeek's network output and compresses older copies. auditd's raw
+safety log is also limited to five 10 MB files.
+
+## 13. Verify the monitoring agent
 
 The graphical additions do not change the heartbeat. Through SSH, run:
 
@@ -509,7 +631,7 @@ Every 30 seconds, the journal should show a heartbeat like:
 
 Press `Ctrl+C` to stop following the journal. This does not stop the agent.
 
-## 13. Check automatic startup
+## 14. Check automatic startup
 
 Reboot the SPE from SSH:
 
@@ -523,10 +645,12 @@ After it starts again, reconnect through SSH and verify:
 sudo systemctl is-active xrdp
 sudo systemctl is-active spe-monitoring-agent
 sudo systemctl is-active spe-internet-restore
+sudo systemctl is-active auditd
+sudo systemctl is-active spe-network-audit
 ~~~
 
-All three services should say `active`. The desktop password remains on the
-VM, so the same Guacamole connection works after a normal reboot.
+All five services should say `active`. The desktop password remains on the VM,
+so the same Guacamole connection works after a normal reboot.
 
 ## Troubleshooting
 
@@ -631,6 +755,32 @@ sudo systemctl restart spe-internet-restore
 sudo spe-internet status
 ~~~
 
+If operating-system audit events are missing, check the service, Laurel plug-
+in, loaded rules, and PAM include:
+
+~~~bash
+sudo systemctl status auditd
+sudo pgrep --list-full laurel
+sudo auditctl -l
+grep -F '@include spe-tty-audit' /etc/pam.d/common-session
+sudo ausearch -k spe_cli --start recent
+~~~
+
+TTY auditing starts when a new PAM session opens. Log out and sign in again if
+the session was already open when the configuration changed.
+
+If network events are missing, check the service and the interface it selected:
+
+~~~bash
+sudo systemctl status spe-network-audit
+sudo journalctl -u spe-network-audit --since today
+ip -4 route show default
+sudo ls -l /var/log/spe-audit/network*
+~~~
+
+Finish a short connection such as `curl https://example.com` and wait a few
+seconds. A connection that is still open is not yet a complete Zeek summary.
+
 ## Cleanup
 
 Stop the local gateway from the `gateway` folder:
@@ -678,6 +828,21 @@ Terraform does not delete the Packer image. Delete the
   production boundary should also use centrally managed cloud egress controls.
 - This proof of concept owns one nftables table. Do not add another service
   that flushes the full nftables ruleset without first integrating the two.
+- The audit files stay on the VM. A root administrator can alter or delete
+  them, and deleting the boot disk deletes the evidence. This proof of concept
+  is not tamper-evident or a replacement for protected off-VM audit storage.
+- `auditd` records external programs and their arguments. `pam_tty_audit`
+  records raw terminal input, including typing mistakes and control keys, but
+  not terminal output or a replayable desktop session.
+- `log_passwd` is deliberately not enabled, so input entered while terminal
+  echo is disabled is not intentionally recorded. Linux PAM warns that some
+  nested or remote password prompts can still be captured. Do not type real
+  secrets in an audited learning terminal.
+- Zeek records addresses, ports, state, duration, packets, and bytes on the
+  default VM interface. It does not store packet payloads and does not tell us
+  which local user or process owns a connection.
+- Local rotation limits growth, but an unusually busy SPE can rotate old audit
+  history quickly. Production retention must be sized and protected centrally.
 
 ## Remember
 
@@ -691,6 +856,11 @@ Terraform does not delete the Packer image. Delete the
 - `spe-internet` controls new outbound connections without changing inbound
   SSH or RDP rules.
 - The saved internet mode is reapplied by systemd after reboot.
+- auditd and `pam_tty_audit` collect login and command-line activity; Laurel
+  makes those events readable JSON Lines.
+- Zeek writes network connection metadata, not packet contents.
+- Researchers cannot modify the two audit outputs as their normal user; the
+  administrator inspects them with `sudo`.
 - Packer installs the reusable software. Terraform creates the network,
   firewall rules, and final SPE.
 - A runtime password is safer than baking one into a reusable image.
@@ -713,3 +883,8 @@ Terraform does not delete the Packer image. Delete the
 - [nftables scripting](https://wiki.netfilter.org/wiki-nftables/index.php/Scripting)
 - [nftables command reference](https://netfilter.org/projects/nftables/manpage.html)
 - [GCP metadata server](https://cloud.google.com/compute/docs/metadata/querying-metadata)
+- [Ubuntu auditd package](https://packages.ubuntu.com/noble/auditd)
+- [Ubuntu Laurel manual](https://manpages.ubuntu.com/manpages/noble/man8/laurel.8.html)
+- [Ubuntu `pam_tty_audit` manual](https://manpages.ubuntu.com/manpages/noble/man8/pam_tty_audit.8.html)
+- [Zeek installation](https://docs.zeek.org/en/lts/install.html)
+- [Zeek connection log](https://docs.zeek.org/en/lts/logs/conn.html)

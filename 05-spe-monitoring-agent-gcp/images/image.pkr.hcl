@@ -34,7 +34,7 @@ source "googlecompute" "spe" {
 
   image_name        = "learn-spe-monitoring-agent-${local.timestamp}"
   image_family      = "learn-spe-monitoring-agent"
-  image_description = "Ubuntu 24.04 SPE image with monitoring, XFCE, JupyterLab, R, and RStudio"
+  image_description = "Ubuntu 24.04 SPE image with monitoring, desktop, data tools, internet control, and local auditing"
   image_labels = {
     component = "spe"
     purpose   = "learning"
@@ -125,6 +125,41 @@ build {
     destination = "/tmp/spe-internet-restore.service"
   }
 
+  provisioner "file" {
+    source      = "../files/spe-audit.rules"
+    destination = "/tmp/spe-audit.rules"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-pam-tty-audit"
+    destination = "/tmp/spe-pam-tty-audit"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-laurel.toml"
+    destination = "/tmp/spe-laurel.toml"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-network-audit.zeek"
+    destination = "/tmp/spe-network-audit.zeek"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-network-audit"
+    destination = "/tmp/spe-network-audit"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-network-audit.service"
+    destination = "/tmp/spe-network-audit.service"
+  }
+
+  provisioner "file" {
+    source      = "../files/spe-audit-logrotate"
+    destination = "/tmp/spe-audit-logrotate"
+  }
+
   provisioner "shell" {
     script = "../scripts/setup.sh"
   }
@@ -135,5 +170,9 @@ build {
 
   provisioner "shell" {
     script = "../scripts/setup-internet-control.sh"
+  }
+
+  provisioner "shell" {
+    script = "../scripts/setup-auditing.sh"
   }
 }

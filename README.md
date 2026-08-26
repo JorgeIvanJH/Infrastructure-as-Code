@@ -22,7 +22,7 @@ Follow the folders in this order:
 | [02 - Accessible VM on GCP](02-accessible-vm-gcp/) | Public IPs, firewall rules, network tags, and SSH with gcloud. |
 | [03 - Packer basics](03-packer-basics/) | Templates, sources, builds, provisioners, variables, parallel builds, and post-processors using Docker locally. |
 | [04 - Terraform and Packer on GCP](04-terraform-packer-gcp/) | Build a custom GCP image, deploy it with Terraform, connect with SSH, and run a small Go app. |
-| [05 - SPE monitoring, desktop, and data tools](05-spe-monitoring-agent-gcp/) | Reach an SPE through Guacamole, read a shared CSV, and control new outbound internet access. |
+| [05 - Complete learning SPE](05-spe-monitoring-agent-gcp/) | Use Guacamole and data tools, control outbound internet, and inspect local OS and network audit logs. |
 
 Use the [glossary](GLOSSARY.md) when a word is new. Each lesson explains only
 the new ideas, so the same definitions do not need to be repeated everywhere.

@@ -1,0 +1,8 @@
+/var/log/spe-audit/network.log {
+    size 10M
+    rotate 5
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
