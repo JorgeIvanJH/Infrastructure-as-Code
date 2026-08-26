@@ -17,18 +17,18 @@ Usage: sudo spe-internet on|off|status
   status  Show the effective and saved modes.
 EOF
 }
-
+# Check if the script is run as root
 require_root() {
   if [[ $EUID -ne 0 ]]; then
     echo "Run this command with sudo." >&2
     exit 1
   fi
 }
-
+# Check if the nftables table exists
 table_exists() {
   nft list table "$TABLE_FAMILY" "$TABLE_NAME" >/dev/null 2>&1
 }
-
+# Save the current mode to the state file
 save_mode() {
   local mode="$1"
   local temporary_file
@@ -38,7 +38,7 @@ save_mode() {
   chmod 0644 "$temporary_file"
   mv "$temporary_file" "$STATE_FILE"
 }
-
+# Enable internet access
 internet_on() {
   if table_exists; then
     nft delete table "$TABLE_FAMILY" "$TABLE_NAME"
@@ -47,7 +47,7 @@ internet_on() {
   save_mode "on"
   echo "Internet access: enabled"
 }
-
+# Disable internet access
 internet_off() {
   local rules_batch
 
@@ -59,8 +59,7 @@ internet_off() {
 
   printf 'include "%s"\n' "$RULES_FILE" >>"$rules_batch"
 
-  # Checking and loading one batch makes replacement atomic. A bad future
-  # allow-list rule cannot remove the currently active protection.
+  # Checking and loading one batch makes replacement atomic. A bad future allow-list rule cannot remove the currently active protection.
   if ! nft --check --file "$rules_batch"; then
     rm -f "$rules_batch"
     exit 1
@@ -75,7 +74,7 @@ internet_off() {
   echo "Internet access: disabled"
   echo "New general outbound connections are blocked."
 }
-
+# Show the effective and saved modes
 internet_status() {
   local effective_mode
   local saved_mode="unknown"
@@ -99,7 +98,7 @@ internet_status() {
     return 1
   fi
 }
-
+# Restore the saved mode on boot
 restore_saved_mode() {
   local saved_mode="on"
 

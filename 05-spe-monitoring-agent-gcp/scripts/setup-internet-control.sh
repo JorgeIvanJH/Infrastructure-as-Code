@@ -34,16 +34,13 @@ sudo rm -f \
   /tmp/spe-internet-allowlist.nft \
   /tmp/spe-internet-restore.service
 
-# Validate both the firewall rules and the boot service before exercising the
-# two modes below.
+# Validate both the firewall rules and the boot service before exercising the two modes below.
 sudo nft --check --file /etc/spe-internet/disabled.nft
 sudo systemctl daemon-reload
 sudo systemd-analyze verify /etc/systemd/system/spe-internet-restore.service
 sudo systemctl enable spe-internet-restore.service
 
-# Exercise both modes while Packer is still connected through SSH. A new HTTPS
-# request must fail in off mode and succeed again in on mode. Leave the reusable
-# image online so a new SPE can finish its normal first boot.
+# Exercise both modes while Packer is still connected through SSH. A new HTTPS request must fail in off mode and succeed again in on mode. Leave the reusable image online so a new SPE can finish its normal first boot.
 sudo /usr/local/sbin/spe-internet off
 if curl --silent --head --connect-timeout 5 https://example.com >/dev/null 2>&1; then
   echo "Internet-off validation failed: the new HTTPS request succeeded." >&2
