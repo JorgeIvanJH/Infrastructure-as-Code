@@ -88,6 +88,7 @@ tools. These resources can cost money.
 |   |-- spe-internet-restore.service
 |   |-- spe-audit-logrotate
 |   |-- spe-audit.rules
+|   |-- AUDIT-LOG-GUIDE.md
 |   |-- spe-laurel.toml
 |   |-- spe-network-audit
 |   |-- spe-network-audit.service
@@ -182,6 +183,11 @@ The small `spe-network-audit` launcher finds the VM's default network
 interface. Its systemd service writes `/var/log/spe-audit/network.log`; the
 friendlier `network.jsonl` name is a link to that file. `spe-audit-logrotate`
 keeps the network output bounded, while Laurel rotates its own output.
+
+`files/AUDIT-LOG-GUIDE.md` explains how to read these records and connect a
+login session with terminal input and executed programs. It also explains how
+to compare that operating-system timeline with Zeek's network timeline without
+claiming that a connection belongs to a process when the logs cannot prove it.
 
 For this small proof of concept, the gateway uses Guacamole's simple XML
 authentication instead of adding a database. Apache describes this as useful
@@ -533,6 +539,10 @@ The two audit outputs are:
 
 Each line is one JSON object. The files are not writable by `speuser`. I use
 the `terraform` administrator and `sudo` to inspect them.
+
+For a field-by-field explanation, including how to recognize automatic `cron`
+events and match login, TTY, program, and network records, see
+[`files/AUDIT-LOG-GUIDE.md`](files/AUDIT-LOG-GUIDE.md).
 
 First, check the collectors through SSH:
 
