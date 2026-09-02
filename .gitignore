@@ -12,7 +12,7 @@ variables.pkrvars.hcl
 # Local Guacamole login and connection settings
 user-mapping.xml
 
-# Local SSH keys used by the GCP image lessons
+# Local SSH keys used by the cloud image lessons
 tf-packer
 tf-packer.pub
 

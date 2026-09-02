@@ -1,4 +1,4 @@
-# Learn Terraform and Packer on Google Cloud
+# Learn Terraform and Packer on Google Cloud and AWS
 
 This repository is my learning path for Infrastructure as Code (IaC). I keep
 the language simple and use small examples that build on each other.
@@ -23,6 +23,7 @@ Follow the folders in this order:
 | [03 - Packer basics](03-packer-basics/) | Templates, sources, builds, provisioners, variables, parallel builds, and post-processors using Docker locally. |
 | [04 - Terraform and Packer on GCP](04-terraform-packer-gcp/) | Build a custom GCP image, deploy it with Terraform, connect with SSH, and run a small Go app. |
 | [05 - Complete learning SPE](05-spe-monitoring-agent-gcp/) | Use Guacamole and data tools, control outbound internet, and inspect local OS and network audit logs. |
+| [06 - Multicloud SPE on GCP and AWS](06-spe-multicloud-gcp-aws/) | Build the same SPE recipe into native GCP and AWS images, select a cloud, and configure comparable compute and storage through variables. |
 
 Use the [glossary](GLOSSARY.md) when a word is new. Each lesson explains only
 the new ideas, so the same definitions do not need to be repeated everywhere.
@@ -34,11 +35,13 @@ Install:
 - [Terraform CLI](https://developer.hashicorp.com/terraform/install)
 - [Packer CLI](https://developer.hashicorp.com/packer/install)
 - [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
-- [Docker Desktop](https://docs.docker.com/desktop/) for lessons 3 and 5
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) for lesson 6
+- [Docker Desktop](https://docs.docker.com/desktop/) for lessons 3, 5, and 6
 - Git and an SSH client
 
 You also need a Google Cloud project with billing and the Compute Engine API
-enabled. Some resources used here can cost money.
+enabled. Lesson 6 additionally needs an AWS account with billing. Some
+resources used here can cost money.
 
 ## Authenticate to Google Cloud
 

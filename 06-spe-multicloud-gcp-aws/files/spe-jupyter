@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+workspace="${SPE_DATA_WORKSPACE:-$HOME/spe-data-lab}"
+export BROWSER="${BROWSER:-epiphany}"
+
+if [[ ! -d "$workspace" ]]; then
+  echo "SPE data workspace not found: $workspace" >&2
+  exit 1
+fi
+
+cd "$workspace"
+exec /opt/spe-python/bin/jupyter lab \
+  --ip=127.0.0.1 \
+  --ServerApp.root_dir="$workspace"

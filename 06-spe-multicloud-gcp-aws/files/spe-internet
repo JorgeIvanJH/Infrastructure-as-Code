@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly STATE_DIRECTORY="/var/lib/spe-internet"
+readonly STATE_FILE="${STATE_DIRECTORY}/mode"
+readonly RULES_FILE="/etc/spe-internet/disabled.nft"
+readonly TABLE_FAMILY="inet"
+readonly TABLE_NAME="spe_egress"
+
+show_usage() {
+  cat <<'EOF'
+Usage: sudo spe-internet on|off|status
+
+  on      Allow new outbound internet connections.
+  off     Block new outbound internet connections.
+  status  Show the effective and saved modes.
+EOF
+}
+# Check if the script is run as root
+require_root() {
+  if [[ $EUID -ne 0 ]]; then
+    echo "Run this command with sudo." >&2
+    exit 1
+  fi
+}
+# Check if the nftables table exists
+table_exists() {
+  nft list table "$TABLE_FAMILY" "$TABLE_NAME" >/dev/null 2>&1
+}
+# Save the current mode to the state file
+save_mode() {
+  local mode="$1"
+  local temporary_file
+
+  temporary_file="$(mktemp "${STATE_DIRECTORY}/mode.XXXXXX")"
+  printf '%s\n' "$mode" >"$temporary_file"
+  chmod 0644 "$temporary_file"
+  mv "$temporary_file" "$STATE_FILE"
+}
+# Enable internet access
+internet_on() {
+  if table_exists; then
+    nft delete table "$TABLE_FAMILY" "$TABLE_NAME"
+  fi
+
+  save_mode "on"
+  echo "Internet access: enabled"
+}
+# Disable internet access
+internet_off() {
+  local rules_batch
+
+  rules_batch="$(mktemp /run/spe-internet.XXXXXX.nft)"
+
+  if table_exists; then
+    printf 'delete table %s %s\n' "$TABLE_FAMILY" "$TABLE_NAME" >"$rules_batch"
+  fi
+
+  printf 'include "%s"\n' "$RULES_FILE" >>"$rules_batch"
+
+  # Checking and loading one batch makes replacement atomic. A bad future allow-list rule cannot remove the currently active protection.
+  if ! nft --check --file "$rules_batch"; then
+    rm -f "$rules_batch"
+    exit 1
+  fi
+  if ! nft --file "$rules_batch"; then
+    rm -f "$rules_batch"
+    exit 1
+  fi
+  rm -f "$rules_batch"
+
+  save_mode "off"
+  echo "Internet access: disabled"
+  echo "New general outbound connections are blocked."
+}
+# Show the effective and saved modes
+internet_status() {
+  local effective_mode
+  local saved_mode="unknown"
+
+  if table_exists; then
+    effective_mode="disabled"
+  else
+    effective_mode="enabled"
+  fi
+
+  if [[ -r "$STATE_FILE" ]]; then
+    saved_mode="$(<"$STATE_FILE")"
+  fi
+
+  echo "Internet access: ${effective_mode}"
+  echo "Saved mode: ${saved_mode}"
+
+  if [[ "$effective_mode" == "enabled" && "$saved_mode" == "off" ]] ||
+    [[ "$effective_mode" == "disabled" && "$saved_mode" == "on" ]]; then
+    echo "Warning: the effective mode does not match the saved mode." >&2
+    return 1
+  fi
+}
+# Restore the saved mode on boot
+restore_saved_mode() {
+  local saved_mode="on"
+
+  if [[ -r "$STATE_FILE" ]]; then
+    saved_mode="$(<"$STATE_FILE")"
+  fi
+
+  case "$saved_mode" in
+    on)
+      internet_on
+      ;;
+    off)
+      internet_off
+      ;;
+    *)
+      echo "Invalid saved internet mode: ${saved_mode}" >&2
+      exit 1
+      ;;
+  esac
+}
+
+case "${1:-}" in
+  on)
+    require_root
+    internet_on
+    ;;
+  off)
+    require_root
+    internet_off
+    ;;
+  status)
+    require_root
+    internet_status
+    ;;
+  restore)
+    require_root
+    restore_saved_mode
+    ;;
+  help | --help | -h)
+    show_usage
+    ;;
+  *)
+    show_usage >&2
+    exit 2
+    ;;
+esac

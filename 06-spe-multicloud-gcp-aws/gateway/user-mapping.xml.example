@@ -1,0 +1,24 @@
+<user-mapping>
+    <!-- This password protects the local Guacamole web page. Change it. -->
+    <authorize username="student" password="CHANGE_ME">
+        <connection name="GCP SPE desktop">
+            <protocol>rdp</protocol>
+            <param name="hostname">GCP_SPE_PUBLIC_IP</param>
+            <param name="port">3389</param>
+            <param name="security">any</param>
+            <param name="ignore-cert">true</param>
+            <!-- Guacamole forwards these credentials to xrdp. -->
+            <param name="username">speuser</param>
+            <param name="password">GCP_SPE_DESKTOP_PASSWORD</param>
+        </connection>
+        <connection name="AWS SPE desktop">
+            <protocol>rdp</protocol>
+            <param name="hostname">AWS_SPE_PUBLIC_IP</param>
+            <param name="port">3389</param>
+            <param name="security">any</param>
+            <param name="ignore-cert">true</param>
+            <param name="username">speuser</param>
+            <param name="password">AWS_SPE_DESKTOP_PASSWORD</param>
+        </connection>
+    </authorize>
+</user-mapping>

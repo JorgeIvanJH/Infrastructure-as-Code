@@ -1,0 +1,8 @@
+# This file is intentionally empty in this proof of concept.
+#
+# A future control-layer exception can be added as one exact address and port.
+# For example:
+#
+# ip daddr 203.0.113.10 tcp dport 8443 ct state new counter accept
+#
+# After changing this file, run `sudo spe-internet off` to reapply the rules.

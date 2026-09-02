@@ -1,0 +1,12 @@
+region            = "us-east-1"
+availability_zone = null
+
+spe_id       = "spe-demo-006-aws"
+vm_size      = "c7i-flex.large"
+disk_size_gb = 30
+disk_type    = "gp3"
+
+vpc_cidr        = "10.61.0.0/16"
+network_cidr    = "10.61.1.0/24"
+ssh_source_cidr = "YOUR_PUBLIC_IPV4/32"
+rdp_source_cidr = "YOUR_PUBLIC_IPV4/32"

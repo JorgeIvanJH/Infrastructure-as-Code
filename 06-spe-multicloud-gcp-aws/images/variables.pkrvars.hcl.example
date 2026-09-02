@@ -1,0 +1,12 @@
+gcp_project_id = "YOUR_GCP_PROJECT_ID"
+gcp_zone       = "us-central1-c"
+aws_region     = "us-east-1"
+
+# These sizes affect only the temporary Packer build machines.
+gcp_build_vm_size = "e2-medium"
+aws_build_vm_size = "c7i-flex.large"
+
+# Both finished image artifacts begin with this boot-disk capacity.
+image_disk_size_gb = 30
+gcp_image_disk_type = "pd-standard"
+aws_image_disk_type = "gp3"

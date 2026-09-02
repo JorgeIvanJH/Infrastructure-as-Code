@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SPE RStudio Data Lab
+Comment=Open the hepatitis example in RStudio
+Exec=rstudio --disable-gpu /home/speuser/spe-data-lab/r/spe-data-lab.Rproj
+Icon=rstudio
+Terminal=false
+Categories=Development;Education;

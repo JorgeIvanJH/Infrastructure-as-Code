@@ -1,0 +1,12 @@
+project_id = "YOUR_GCP_PROJECT_ID"
+region     = "us-central1"
+zone       = "us-central1-c"
+
+spe_id       = "spe-demo-006-gcp"
+vm_size      = "e2-medium"
+disk_size_gb = 30
+disk_type    = "pd-standard"
+
+network_cidr    = "10.60.1.0/24"
+ssh_source_cidr = "YOUR_PUBLIC_IPV4/32"
+rdp_source_cidr = "YOUR_PUBLIC_IPV4/32"

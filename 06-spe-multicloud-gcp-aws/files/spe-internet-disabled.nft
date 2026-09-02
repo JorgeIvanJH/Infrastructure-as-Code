@@ -1,0 +1,24 @@
+table inet spe_egress {
+    chain output {
+        type filter hook output priority filter; policy drop;
+
+        # Local applications can still communicate with each other.
+        oifname "lo" counter accept
+
+        # Replies for inbound SSH and RDP, and traffic from connections that
+        # were already open, continue to work.
+        ct state established,related counter accept
+
+        # Keep the cloud guest environment healthy. GCP, AWS, and Azure use
+        # this link-local address for VM metadata. It is not a route to the
+        # general internet.
+        ip daddr 169.254.169.254 counter accept
+
+        # Permit network address renewal after the mode survives a reboot.
+        udp sport 68 udp dport 67 counter accept
+        udp sport 546 udp dport 547 counter accept
+
+        # Future control-layer exceptions are kept in a separate small file.
+        include "/etc/spe-internet/allowlist.nft"
+    }
+}
