@@ -2,6 +2,20 @@ Zeek is a free and open-source network analysis framework. it watches the packet
 
 the full pipeline, in simple words: packets arrive at the network interface, linux hands them to zeek through `AF_PACKET` and `libpcap`, zeek reassembles them into connections and recognises the protocols inside (DNS, HTTP, TLS, ...), turns what it sees into events (new connection, DNS query, HTTP request, ...), runs the policy scripts we loaded against those events, and hands structured records to its logging framework, whose ASCII writer stores them in files like `conn.log`, `dns.log`, `http.log`.
 
+~~~mermaid
+flowchart LR
+    N["network interface<br>the one with the default route"]
+    P["AF_PACKET + libpcap<br>packet capture"]
+    Z["zeek<br>reassembles connections,<br>recognises protocols"]
+    E["events<br>new connection, DNS query, HTTP request, ..."]
+    L["local.zeek<br>keep only the connection log,<br>15 fields, JSON"]
+    F["logging framework<br>ASCII writer"]
+    C["/var/log/spe-audit/current/network.log<br>live, this hour"]
+    A["/var/log/spe-audit/YYYY-MM-DD/<br>network.*.log.gz, kept 7 days"]
+    N --> P --> Z --> E --> L --> F --> C
+    C -- "every hour, ZeekControl" --> A
+~~~
+
 we run all this the official way, with ZeekControl (`zeekctl`), zeek's own operations tool, as one standalone node. that is where the three files come from:
 
 - [node.cfg](node.cfg) says which node to run and which interface it watches.
@@ -11,6 +25,21 @@ we run all this the official way, with ZeekControl (`zeekctl`), zeek's own opera
 plus [networks.cfg](networks.cfg), which lists the networks that count as "local"; private address space is automatic so it lists nothing.
 
 two things are ours because ZeekControl does not do them. first, a static `node.cfg` cannot know the interface name, which differs between GCP and AWS. [zeek-set-interface](zeek-set-interface) rewrites the `interface=` line at every start with the interface carrying the default route, so one image works on both clouds. second, ZeekControl expects to be started by hand and kept healthy by a cron job. [zeek.service](zeek.service) runs `zeekctl deploy` at boot and `zeekctl stop` at shutdown, and [zeek-cron.timer](zeek-cron.timer) runs `zeekctl cron` every five minutes, exactly what the docs ask for in crontab. both run as `spe-netaudit`, not root, with only the two capabilities packet capture needs.
+
+~~~mermaid
+flowchart TB
+    B["boot"] --> U["zeek.service"]
+    U -- "ExecStartPre, as root" --> I["zeek-set-interface<br>writes interface= into node.cfg"]
+    I --> D["zeekctl deploy<br>as spe-netaudit"]
+    CFG["node.cfg<br>zeekctl.cfg<br>networks.cfg<br>local.zeek"] -. "read by" .-> D
+    D --> ZN["zeek node<br>captures and logs"]
+    ZN --> C["/var/log/spe-audit/current/network.log"]
+    T["zeek-cron.timer<br>every 5 minutes"] --> CR["zeekctl cron"]
+    CR -- "restart if crashed" --> ZN
+    CR -- "delete archives older than 7 days" --> AR["/var/log/spe-audit/YYYY-MM-DD/"]
+    C -- "hourly rotation" --> AR
+    S["shutdown"] --> ST["zeekctl stop<br>flush and archive"] --> AR
+~~~
 
 ZeekControl loads zeek's full default script set, so protocol recognition is on. we keep only the connection log anyway: the last block in `local.zeek` disables every other stream. the SPE audits who talked to whom, not what they said. delete that block to get `dns.log`, `ssl.log`, `http.log` and the rest back.
 

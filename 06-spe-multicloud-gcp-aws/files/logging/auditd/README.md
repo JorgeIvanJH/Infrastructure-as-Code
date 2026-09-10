@@ -8,6 +8,27 @@ the kernel generates an event whenever one of three things happens:
 
 then these events are sent to auditd, the writer, which stores them in a physical file, `/var/log/audit/audit.log`, in a raw text format we can parse (more on that below). how that file behaves is configured in [auditd.conf](auditd.conf), a copy of the stock ubuntu 24.04 file where we changed three keys: rotate at 10 MB (`max_log_file`), keep 5 files (`num_logs`), and rotate instead of stopping when the limit is reached (`max_log_file_action = ROTATE`). everything else, including `log_format = ENRICHED` and `log_group = root`, is the distribution default.
 
+~~~mermaid
+flowchart LR
+    subgraph triggers["what makes the kernel record something"]
+        R["50-spe.rules<br>a human runs a program (execve)"]
+        P["PAM session events<br>login, logout, sudo, cron<br>always on, no rule needed"]
+        T["spe-tty-audit<br>keystrokes in a terminal"]
+    end
+    K["kernel audit subsystem<br>decides what to record"]
+    A["auditd daemon<br>writes it down"]
+    C["auditd.conf<br>10 MB x 5 files, ROTATE, ENRICHED"]
+    L["/var/log/audit/audit.log<br>raw text, several lines per event<br>0600 root:root"]
+    S["ausearch / aureport<br>group the lines, decode the hex"]
+    R --> K
+    P --> K
+    T --> K
+    K -- "netlink socket" --> A
+    C -. "configures" .-> A
+    A --> L
+    L --> S
+~~~
+
 # where each file lands on the VM
 
 | here | on the VM | installed by |
@@ -21,6 +42,21 @@ the file names are the same here and on the VM on purpose, so a `grep` in either
 # most relevant raw auditd outputs
 
 one action produces several lines. they all share the same `msg=audit(time:serial)` stamp, and that stamp is what groups them into one event. `time` is unix seconds with milliseconds, `serial` restarts at every boot.
+
+~~~mermaid
+flowchart TB
+    E["speuser types<br>python3 --version"]
+    E --> S1["type=SYSCALL<br>who, which syscall, key=spe_cli"]
+    E --> S2["type=EXECVE<br>a0=python3 a1=--version"]
+    E --> S3["type=CWD<br>where it ran"]
+    E --> S4["type=PATH<br>which binary"]
+    E --> S5["type=PROCTITLE<br>command line, hex"]
+    S1 --> G["one event<br>msg=audit(1787762101.420:966)"]
+    S2 --> G
+    S3 --> G
+    S4 --> G
+    S5 --> G
+~~~
 
 this is what `python3 --version` typed by `speuser` looks like, trimmed for width:
 
