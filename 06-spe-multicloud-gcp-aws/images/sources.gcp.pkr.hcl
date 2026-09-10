@@ -8,6 +8,10 @@ source "googlecompute" "gcp" {
   source_image_project_id = ["ubuntu-os-cloud"]
   ssh_username            = "ubuntu"
 
+  # The temporary build VM carries this tag so a firewall rule can admit SSH from
+  # the build laptop only. See scripts/image/README.md, "before the first build".
+  tags = ["packer-build"]
+
   image_name        = "${local.image_family}-${local.build_timestamp}"
   image_family      = local.image_family
   image_description = "Ubuntu 24.04 multicloud learning SPE built natively on GCP"

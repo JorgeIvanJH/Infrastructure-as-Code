@@ -33,7 +33,7 @@ flowchart LR
 
 | here | on the VM | installed by |
 |---|---|---|
-| `50-spe.rules` | `/etc/audit/rules.d/50-spe.rules` | [setup-auditing.sh](../../../scripts/setup-auditing.sh) |
+| `50-spe.rules` | `/etc/audit/rules.d/50-spe.rules` | [setup-auditing.sh](../../../scripts/image/setup-auditing.sh) |
 | `spe-tty-audit` | `/etc/pam.d/spe-tty-audit`, included from `/etc/pam.d/common-session` | same |
 | `auditd.conf` | `/etc/audit/auditd.conf` | same |
 

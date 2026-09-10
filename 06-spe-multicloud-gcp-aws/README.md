@@ -120,6 +120,13 @@ gcloud auth application-default login
 gcloud config get-value project
 ~~~
 
+Packer reaches its temporary GCP build VM over SSH from my laptop, so the
+project's `default` network needs a rule admitting TCP 22 from my current
+public address to instances tagged `packer-build`. A fresh project has a
+world-open `default-allow-ssh` rule; mine did not, and the build failed with
+`Timeout waiting for SSH`. The narrow rule and how to update it when my address
+changes are in `scripts/image/README.md`.
+
 Check AWS in a newly opened PowerShell window:
 
 ~~~powershell
@@ -154,7 +161,7 @@ aws login --profile default
 aws sts get-caller-identity --profile default
 ~~~
 
-The later AWS commands use `scripts\Invoke-WithAwsLogin.ps1`. The helper can
+The later AWS commands use `scripts\aws-login\Invoke-WithAwsLogin.ps1`. The helper can
 refresh credentials during a long Packer build, does not print them, and does
 not write them to a file. Only processes on my laptop that know a random
 temporary token can call its loopback endpoint. If I already use a normal AWS
@@ -226,13 +233,13 @@ packer build -only="spe.googlecompute.gcp" -var-file="variables.pkrvars.hcl" .
 Build only AWS:
 
 ~~~powershell
-& ..\scripts\Invoke-WithAwsLogin.ps1 packer build '-only=spe.amazon-ebs.aws' '-var-file=variables.pkrvars.hcl' .
+& ..\scripts\aws-login\Invoke-WithAwsLogin.ps1 packer build '-only=spe.amazon-ebs.aws' '-var-file=variables.pkrvars.hcl' .
 ~~~
 
 Build both in one run:
 
 ~~~powershell
-& ..\scripts\Invoke-WithAwsLogin.ps1 packer build '-var-file=variables.pkrvars.hcl' .
+& ..\scripts\aws-login\Invoke-WithAwsLogin.ps1 packer build '-var-file=variables.pkrvars.hcl' .
 ~~~
 
 The last command can build in both clouds at the same time, so it can incur
@@ -301,8 +308,8 @@ terraform fmt
 terraform validate
 
 if ($cloud -eq "aws") {
-    & ..\..\scripts\Invoke-WithAwsLogin.ps1 terraform plan
-    & ..\..\scripts\Invoke-WithAwsLogin.ps1 terraform apply
+    & ..\..\scripts\aws-login\Invoke-WithAwsLogin.ps1 terraform plan
+    & ..\..\scripts\aws-login\Invoke-WithAwsLogin.ps1 terraform apply
 }
 else {
     terraform plan
@@ -451,7 +458,7 @@ Destroy final infrastructure from each root that was applied:
 
 ~~~powershell
 terraform '-chdir=instances\gcp' destroy
-& .\scripts\Invoke-WithAwsLogin.ps1 terraform '-chdir=instances\aws' destroy
+& .\scripts\aws-login\Invoke-WithAwsLogin.ps1 terraform '-chdir=instances\aws' destroy
 docker compose -f gateway\compose.yaml down
 ~~~
 

@@ -159,22 +159,22 @@ build {
   }
 
   provisioner "shell" {
-    script = "../scripts/setup.sh"
+    script = "../scripts/image/setup.sh"
   }
 
   provisioner "shell" {
-    script = "../scripts/setup-data-tools.sh"
+    script = "../scripts/image/setup-data-tools.sh"
   }
 
   provisioner "shell" {
-    script = "../scripts/setup-internet-control.sh"
+    script = "../scripts/image/setup-internet-control.sh"
   }
 
   provisioner "shell" {
-    script = "../scripts/setup-auditing.sh"
+    script = "../scripts/image/setup-auditing.sh"
   }
 
   provisioner "shell" {
-    script = "../scripts/cleanup-image.sh"
+    script = "../scripts/image/cleanup-image.sh"
   }
 }

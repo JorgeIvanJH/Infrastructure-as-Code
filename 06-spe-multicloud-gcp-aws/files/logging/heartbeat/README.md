@@ -2,7 +2,7 @@ The heartbeat service is a custom one created to send additional information abo
 
 the SPE id and the heartbeat interval are not baked inside the image. they are attached to the instance by `terraform apply` and read at boot through the instance metadata endpoint, `169.254.169.254`. that address is whitelisted in [spe-internet-disabled.nft](../../internet-control/spe-internet-disabled.nft) so it keeps working with the internet off, and [spe-metadata.nft](../../internet-control/spe-metadata.nft) restricts who may use it, in both modes, to `root` (this boot step and the cloud agents), `terraform` (the admin) and `_chrony` (time sync). the researcher cannot query it.
 
-the actual daemon is the script in [spe-monitoring-agent.py](spe-monitoring-agent.py), configured to run as a systemd service through [spe-monitoring-agent.service](spe-monitoring-agent.service), and installed by [setup.sh](../../../scripts/setup.sh). before it can start, [spe-identity](spe-identity), run once at boot by [spe-identity.service](spe-identity.service), asks the metadata endpoint for the values terraform attached and writes them to `/etc/spe/identity.env`. the agent's unit `Requires=` that step and loads the file with `EnvironmentFile=`. if the identity is missing, there is no heartbeat at all rather than one with made-up values.
+the actual daemon is the script in [spe-monitoring-agent.py](spe-monitoring-agent.py), configured to run as a systemd service through [spe-monitoring-agent.service](spe-monitoring-agent.service), and installed by [setup.sh](../../../scripts/image/setup.sh). before it can start, [spe-identity](spe-identity), run once at boot by [spe-identity.service](spe-identity.service), asks the metadata endpoint for the values terraform attached and writes them to `/etc/spe/identity.env`. the agent's unit `Requires=` that step and loads the file with `EnvironmentFile=`. if the identity is missing, there is no heartbeat at all rather than one with made-up values.
 
 ~~~mermaid
 flowchart LR
@@ -41,7 +41,7 @@ the probe is itself a connection, so zeek records it: one `network.log` line per
 | `spe-identity` | `/usr/local/sbin/spe-identity` | detects the cloud from DMI, fetches `spe-id`, `spe-heartbeat-interval`, instance id and region from the metadata endpoint, checks their shape, writes the env file atomically |
 | `spe-identity.service` | `/etc/systemd/system/spe-identity.service` | oneshot at boot, as root, after the network is online and the internet mode is restored |
 
-all installed by [setup.sh](../../../scripts/setup.sh). the build only verifies the units and compiles the python; it cannot run `spe-identity`, because the build VM carries no SPE metadata, and that is the point. `/etc/spe/identity.env` exists only on a deployed SPE.
+all installed by [setup.sh](../../../scripts/image/setup.sh). the build only verifies the units and compiles the python; it cannot run `spe-identity`, because the build VM carries no SPE metadata, and that is the point. `/etc/spe/identity.env` exists only on a deployed SPE.
 
 # most relevant raw Heartbeat outputs
 

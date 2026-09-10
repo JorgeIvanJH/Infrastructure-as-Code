@@ -27,7 +27,7 @@ flowchart LR
 | `spe-metadata.nft` | `/etc/spe-internet/metadata.nft` | who may reach `169.254.169.254`: `root`, `terraform`, `_chrony`. loaded in both modes |
 | `spe-internet-restore.service` | `/etc/systemd/system/spe-internet-restore.service` | oneshot at boot, runs `spe-internet restore` so the saved mode is applied before anyone logs in |
 
-all installed by [setup-internet-control.sh](../../scripts/setup-internet-control.sh), which also proves the design at build time: a new HTTPS request must fail with the internet off and succeed with it on, and the metadata endpoint must answer `root` and `terraform` but refuse `speuser`.
+all installed by [setup-internet-control.sh](../../scripts/image/setup-internet-control.sh), which also proves the design at build time: a new HTTPS request must fail with the internet off and succeed with it on, and the metadata endpoint must answer `root` and `terraform` but refuse `speuser`.
 
 # what the sealed mode still allows, and why
 

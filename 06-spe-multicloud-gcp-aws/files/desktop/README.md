@@ -10,7 +10,7 @@ the researcher works inside an XFCE desktop reached through Guacamole and RDP. t
 | `spe-jupyter.desktop` | `/usr/share/applications/spe-jupyter.desktop` | menu entry **SPE JupyterLab**, runs the launcher in a terminal |
 | `spe-rstudio.desktop` | `/usr/share/applications/spe-rstudio.desktop` | menu entry **SPE RStudio Data Lab**, opens `/home/speuser/spe-data-lab/r/spe-data-lab.Rproj` with `--disable-gpu`, which RStudio needs over RDP |
 
-all installed by [setup-data-tools.sh](../../scripts/setup-data-tools.sh), which also creates the python environment, installs R and RStudio, and copies the example workspace into `speuser`'s home.
+all installed by [setup-data-tools.sh](../../scripts/image/setup-data-tools.sh), which also creates the python environment, installs R and RStudio, and copies the example workspace into `speuser`'s home.
 
 # two things worth knowing
 

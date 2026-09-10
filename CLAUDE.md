@@ -41,7 +41,7 @@ Lesson 06 builds one cloud at a time by build address. The build block is named 
 
 ~~~powershell
 packer build -only="spe.googlecompute.gcp" -var-file="variables.pkrvars.hcl" .
-& ..\scripts\Invoke-WithAwsLogin.ps1 packer build '-only=spe.amazon-ebs.aws' '-var-file=variables.pkrvars.hcl' .
+& ..\scripts\aws-login\Invoke-WithAwsLogin.ps1 packer build '-only=spe.amazon-ebs.aws' '-var-file=variables.pkrvars.hcl' .
 ~~~
 
 Guacamole gateway for lessons 05 and 06, from the lesson's `gateway/` folder:
@@ -58,10 +58,10 @@ The Packer Amazon plugin cannot read an `aws login` session. Any `packer` or `te
 that touches AWS must be wrapped:
 
 ~~~powershell
-& ..\..\scripts\Invoke-WithAwsLogin.ps1 terraform plan
+& ..\..\scripts\aws-login\Invoke-WithAwsLogin.ps1 terraform plan
 ~~~
 
-The wrapper starts [aws-login-credential-server.py](06-spe-multicloud-gcp-aws/scripts/aws-login-credential-server.py)
+The wrapper starts [aws-login-credential-server.py](06-spe-multicloud-gcp-aws/scripts/aws-login/aws-login-credential-server.py)
 on a random loopback port, exports the container-credentials environment variables, runs the
 command, then kills the server and restores the previous environment. It never writes credentials
 to disk. GCP commands need no wrapper because Application Default Credentials work directly.
@@ -138,13 +138,13 @@ Every artifact reaches the build VM the same way, and this convention is load-be
 3. The same script deletes the temporary copy.
 
 Shell provisioners run in order and the order matters:
-[setup.sh](06-spe-multicloud-gcp-aws/scripts/setup.sh) for desktop, users, and heartbeat, then
-[setup-data-tools.sh](06-spe-multicloud-gcp-aws/scripts/setup-data-tools.sh) for JupyterLab, R,
+[setup.sh](06-spe-multicloud-gcp-aws/scripts/image/setup.sh) for desktop, users, and heartbeat, then
+[setup-data-tools.sh](06-spe-multicloud-gcp-aws/scripts/image/setup-data-tools.sh) for JupyterLab, R,
 RStudio, and the workspace, then
-[setup-internet-control.sh](06-spe-multicloud-gcp-aws/scripts/setup-internet-control.sh) for
-nftables, then [setup-auditing.sh](06-spe-multicloud-gcp-aws/scripts/setup-auditing.sh) for auditd
+[setup-internet-control.sh](06-spe-multicloud-gcp-aws/scripts/image/setup-internet-control.sh) for
+nftables, then [setup-auditing.sh](06-spe-multicloud-gcp-aws/scripts/image/setup-auditing.sh) for auditd
 and Zeek, and finally
-[cleanup-image.sh](06-spe-multicloud-gcp-aws/scripts/cleanup-image.sh) to drop build SSH keys and
+[cleanup-image.sh](06-spe-multicloud-gcp-aws/scripts/image/cleanup-image.sh) to drop build SSH keys and
 caches. Adding a file means editing both the build template and the installing script.
 
 ### Scripts fail the build, not the VM
