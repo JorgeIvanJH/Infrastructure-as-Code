@@ -3,7 +3,8 @@
 set -euo pipefail
 
 # auditd records operating-system events in its own raw log.
-# Zeek records local connection summaries, including address, port, and bytes.
+# Zeek, run by ZeekControl, records local connection summaries: address, port,
+# and bytes.
 sudo install -d -o root -g root -m 0755 /etc/apt/keyrings
 curl -fsSL \
   https://download.opensuse.org/repositories/security:/zeek/xUbuntu_24.04/Release.key \
@@ -16,8 +17,8 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
   auditd \
   jq \
   libpam-modules \
-  logrotate \
-  zeek-lts-core
+  zeek-lts-core \
+  zeekctl-lts
 
 # A dedicated no-login account runs Zeek and owns its output directory.
 # Researchers can inspect with sudo but cannot modify the logs.
@@ -43,32 +44,52 @@ if ! grep -Fxq '@include spe-tty-audit' /etc/pam.d/common-session; then
   echo '@include spe-tty-audit' | sudo tee -a /etc/pam.d/common-session >/dev/null
 fi
 
-# Configure the small Zeek service and a stable JSONL path. Zeek calls its
-# physical file network.log; the symlink gives students the clearer name used
-# throughout this lesson.
-sudo install -d -o root -g root -m 0755 /opt/zeek/share/zeek/site
+# Configure ZeekControl: one standalone node, the site policy, and the archive
+# directory. ZeekControl runs unprivileged as spe-netaudit, so its run-time
+# data (spool) and its archive (LogDir) belong to that account. The live logs
+# are reached through the "current" symlink ZeekControl keeps in LogDir; the
+# network.jsonl symlink gives students the clearer name used in this lesson.
+sudo install -d -o root -g root -m 0755 /opt/zeek/etc /opt/zeek/share/zeek/site
 sudo install -o root -g root -m 0644 \
-  /tmp/spe-network-audit.zeek \
-  /opt/zeek/share/zeek/site/spe-network-audit.zeek
+  /tmp/node.cfg \
+  /opt/zeek/etc/node.cfg
+sudo install -o root -g root -m 0644 \
+  /tmp/networks.cfg \
+  /opt/zeek/etc/networks.cfg
+sudo install -o root -g root -m 0644 \
+  /tmp/zeekctl.cfg \
+  /opt/zeek/etc/zeekctl.cfg
+sudo install -o root -g root -m 0644 \
+  /tmp/local.zeek \
+  /opt/zeek/share/zeek/site/local.zeek
 sudo install -o root -g root -m 0755 \
-  /tmp/spe-network-audit \
-  /usr/local/sbin/spe-network-audit
+  /tmp/zeek-set-interface \
+  /usr/local/sbin/zeek-set-interface
 sudo install -o root -g root -m 0644 \
-  /tmp/spe-network-audit.service \
-  /etc/systemd/system/spe-network-audit.service
+  /tmp/zeek.service \
+  /etc/systemd/system/zeek.service
 sudo install -o root -g root -m 0644 \
-  /tmp/spe-audit \
-  /etc/logrotate.d/spe-audit
-sudo ln -sfn network.log /var/log/spe-audit/network.jsonl
+  /tmp/zeek-cron.service \
+  /etc/systemd/system/zeek-cron.service
+sudo install -o root -g root -m 0644 \
+  /tmp/zeek-cron.timer \
+  /etc/systemd/system/zeek-cron.timer
+sudo install -d -o spe-netaudit -g spe-netaudit -m 0750 /opt/zeek/spool
+sudo chown -R spe-netaudit:spe-netaudit /opt/zeek/spool
+sudo ln -sfn current/network.log /var/log/spe-audit/network.jsonl
 
 sudo rm -f \
   /tmp/50-spe.rules \
   /tmp/auditd.conf \
   /tmp/spe-tty-audit \
-  /tmp/spe-network-audit.zeek \
-  /tmp/spe-network-audit \
-  /tmp/spe-network-audit.service \
-  /tmp/spe-audit
+  /tmp/node.cfg \
+  /tmp/networks.cfg \
+  /tmp/zeekctl.cfg \
+  /tmp/local.zeek \
+  /tmp/zeek-set-interface \
+  /tmp/zeek.service \
+  /tmp/zeek-cron.service \
+  /tmp/zeek-cron.timer
 
 # Validate configuration before saving the image.
 sudo augenrules --check
@@ -78,27 +99,37 @@ sudo grep -Eq '^max_log_file = 10$' /etc/audit/auditd.conf
 sudo grep -Eq '^num_logs = 5$' /etc/audit/auditd.conf
 sudo grep -Eq '^max_log_file_action = ROTATE$' /etc/audit/auditd.conf
 grep -Fxq '@include spe-tty-audit' /etc/pam.d/common-session
-sudo systemd-analyze verify /etc/systemd/system/spe-network-audit.service
-sudo /opt/zeek/bin/zeek -b /opt/zeek/share/zeek/site/spe-network-audit.zeek
-sudo rm -f /var/log/spe-audit/network.log
+sudo systemd-analyze verify \
+  /etc/systemd/system/zeek.service \
+  /etc/systemd/system/zeek-cron.service \
+  /etc/systemd/system/zeek-cron.timer
+# The interface step must succeed on this build VM, and zeekctl check parses
+# node.cfg, zeekctl.cfg, networks.cfg and local.zeek as the runtime account.
+sudo /usr/local/sbin/zeek-set-interface
+grep -Eq '^interface=[a-z0-9]+$' /opt/zeek/etc/node.cfg
+sudo -u spe-netaudit /opt/zeek/bin/zeekctl check
 
 sudo systemctl daemon-reload
-sudo systemctl enable auditd.service spe-network-audit.service
+sudo systemctl enable auditd.service zeek.service zeek-cron.timer
 
 # Restart auditd so the new log settings apply during this build. Its unit
 # refuses manual stops, so the init script is used instead of systemctl.
 sudo service auditd restart
-sudo systemctl start spe-network-audit.service
 sudo systemctl is-active auditd.service
-for attempt in {1..10}; do
-  if sudo systemctl is-active --quiet spe-network-audit.service; then
+
+# Deploy the Zeek node through its unit, exactly as it will start on every
+# SPE, and wait until ZeekControl reports it running.
+sudo systemctl start zeek.service
+for attempt in {1..20}; do
+  if sudo -u spe-netaudit /opt/zeek/bin/zeekctl status | grep -q running; then
     break
   fi
   sleep 1
 done
-if ! sudo systemctl is-active --quiet spe-network-audit.service; then
-  sudo systemctl --no-pager --full status spe-network-audit.service || true
-  sudo journalctl --no-pager -u spe-network-audit.service -n 30 || true
+if ! sudo -u spe-netaudit /opt/zeek/bin/zeekctl status | grep -q running; then
+  sudo systemctl --no-pager --full status zeek.service || true
+  sudo journalctl --no-pager -u zeek.service -n 30 || true
+  sudo -u spe-netaudit /opt/zeek/bin/zeekctl diag || true
   exit 1
 fi
 
@@ -107,33 +138,34 @@ fi
 # the execve rule fires.
 curl --silent --show-error --output /dev/null --connect-timeout 5 https://example.com
 sleep 2
-# A graceful stop finalizes any connection that Zeek still considers open.
-sudo systemctl stop spe-network-audit.service
+# Stopping the node flushes its logs and archives them into LogDir/<date>/,
+# which exercises the same rotation path a running SPE uses every hour.
+sudo systemctl stop zeek.service
 
 # Confirm both outputs exist: a tagged execve record in auditd's raw log and
-# valid JSON Lines from Zeek.
+# a compressed, archived Zeek log holding valid JSON Lines.
 for attempt in {1..15}; do
   if sudo grep -q 'key="spe_cli"' /var/log/audit/audit.log && \
-     [[ -s /var/log/spe-audit/network.log ]]; then
+     sudo find /var/log/spe-audit -name 'network.*.log.gz' | grep -q .; then
     break
   fi
   sleep 1
 done
 if ! sudo grep -q 'key="spe_cli"' /var/log/audit/audit.log || \
-   [[ ! -s /var/log/spe-audit/network.log ]]; then
-  sudo ls -la /var/log/audit /var/log/spe-audit
+   ! sudo find /var/log/spe-audit -name 'network.*.log.gz' | grep -q .; then
+  sudo ls -laR /var/log/audit /var/log/spe-audit
   sudo tail -n 20 /var/log/audit/audit.log || true
-  sudo journalctl --no-pager -u auditd.service -u spe-network-audit.service -n 50 || true
+  sudo journalctl --no-pager -u auditd.service -u zeek.service -n 50 || true
   exit 1
 fi
 sudo ausearch -k spe_cli --start recent >/dev/null
-sudo tail -n 1 /var/log/spe-audit/network.log | jq --exit-status . >/dev/null
-sudo logrotate --debug /etc/logrotate.d/spe-audit >/dev/null
+sudo find /var/log/spe-audit -name 'network.*.log.gz' -exec zcat {} + \
+  | tail -n 1 | jq --exit-status . >/dev/null
 
-# Leave collection running in the build VM and enabled in every SPE made from
-# the image.
-sudo systemctl start spe-network-audit.service
-sudo systemctl is-active spe-network-audit.service
+# The build VM's own traffic is not evidence for any SPE. Remove the archived
+# build logs; the node is left stopped and starts through its unit on boot.
+sudo find /var/log/spe-audit -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
 
 sudo systemctl is-enabled auditd.service
-sudo systemctl is-enabled spe-network-audit.service
+sudo systemctl is-enabled zeek.service
+sudo systemctl is-enabled zeek-cron.timer

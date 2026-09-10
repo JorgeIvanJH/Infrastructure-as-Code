@@ -1,0 +1,19 @@
+[Unit]
+Description=ZeekControl housekeeping: restart a crashed node, expire archived logs
+After=zeek.service
+
+[Service]
+Type=oneshot
+User=spe-netaudit
+Group=spe-netaudit
+ExecStart=/opt/zeek/bin/zeekctl cron
+UMask=0027
+# Same sandbox as zeek.service: cron may restart the node, which needs capture.
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/zeek/spool /var/log/spe-audit
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK AF_PACKET

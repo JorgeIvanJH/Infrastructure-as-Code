@@ -1,0 +1,10 @@
+[Unit]
+Description=Run ZeekControl housekeeping every five minutes
+
+[Timer]
+# The ZeekControl documentation suggests */5 in crontab; this is the same.
+OnBootSec=5min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,28 @@
+[Unit]
+Description=Zeek network monitor managed by ZeekControl
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+# zeekctl deploy starts the node and returns; the node keeps running in this
+# unit's cgroup until zeekctl stop is called.
+Type=oneshot
+RemainAfterExit=yes
+User=spe-netaudit
+Group=spe-netaudit
+# Root for this one step only: it rewrites the interface line in node.cfg.
+ExecStartPre=+/usr/local/sbin/zeek-set-interface
+ExecStart=/opt/zeek/bin/zeekctl deploy
+ExecStop=/opt/zeek/bin/zeekctl stop
+UMask=0027
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/zeek/spool /var/log/spe-audit
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK AF_PACKET
+
+[Install]
+WantedBy=multi-user.target

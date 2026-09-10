@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Rewrite the interface line of node.cfg with the interface carrying the default
+# IPv4 route. Runs as root from ExecStartPre before ZeekControl deploys, so the
+# same image works on GCP and AWS, where the interface name differs.
+node_cfg=/opt/zeek/etc/node.cfg
+interface="$(ip -4 route show default | awk 'NR == 1 { print $5; exit }')"
+
+if [[ -z "${interface}" ]]; then
+  echo "No default network interface was found." >&2
+  exit 1
+fi
+
+sed -i -E "s/^interface=.*/interface=${interface}/" "${node_cfg}"
+echo "ZeekControl node interface set to ${interface}"
