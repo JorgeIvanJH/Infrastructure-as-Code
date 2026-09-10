@@ -1,12 +1,71 @@
-auditd is the linux native logging framework.
+auditd is the linux native auditing framework. it has two halves: the kernel decides what to record, and the auditd daemon writes it down.
 
-it takes events collected by a kernel defined according to a set of rules that we define in:
+the kernel generates an event whenever one of three things happens:
 
-- [50-spe.rules](50-spe.rules) Records execution attempts made by 64-bit and 32-bit programs
-- [spe-tty-audit](spe-tty-audit) Records what users type or paste into their terminal sessions. Terminal recording is disabled for all other users.
+- a rule we loaded matches. our rules live in [50-spe.rules](50-spe.rules) and record every program a human starts (`execve`), for 64-bit and 32-bit binaries. the `50` prefix is the upstream slot for "server specific rules"; `augenrules` only picks up files ending in `.rules` and merges them in numeric order into `/etc/audit/audit.rules`.
+- a program like `sshd`, `sudo`, or `xrdp` opens or closes a session through PAM. these login, logout, and credential events (`USER_LOGIN`, `USER_START`, `USER_END`, `CRED_ACQ`, ...) are hard-wired: they are always sent when auditing is on, so no rule is needed for them.
+- a terminal session has TTY auditing switched on. [spe-tty-audit](spe-tty-audit) does that for every session PAM opens, including root shells reached through `sudo`, so what users type or paste into a terminal is recorded, shell built-ins like `cd` included. `log_passwd` is left out, so anything typed while echo is off (password prompts) is not captured.
 
-then these events are sent to auditd writer who handles a physical file storing the logs in a special format that we can parse (we will look at this later). this phycical file with the raw audits can be configured using the file (TODO: if missing, create in this folder) called auditd.conf describing maximum size, rotation, etc.
+then these events are sent to auditd, the writer, which stores them in a physical file, `/var/log/audit/audit.log`, in a raw text format we can parse (more on that below). how that file behaves is configured in [auditd.conf](auditd.conf), a copy of the stock ubuntu 24.04 file where we changed three keys: rotate at 10 MB (`max_log_file`), keep 5 files (`num_logs`), and rotate instead of stopping when the limit is reached (`max_log_file_action = ROTATE`). everything else, including `log_format = ENRICHED` and `log_group = root`, is the distribution default.
 
-# Most relevant raw auditd outputs:
+# where each file lands on the VM
 
-TODO: show example of how the audit.log would look like with the most important fields
+| here | on the VM | installed by |
+|---|---|---|
+| `50-spe.rules` | `/etc/audit/rules.d/50-spe.rules` | [setup-auditing.sh](../../../scripts/setup-auditing.sh) |
+| `spe-tty-audit` | `/etc/pam.d/spe-tty-audit`, included from `/etc/pam.d/common-session` | same |
+| `auditd.conf` | `/etc/audit/auditd.conf` | same |
+
+the file names are the same here and on the VM on purpose, so a `grep` in either place finds the other.
+
+# most relevant raw auditd outputs
+
+one action produces several lines. they all share the same `msg=audit(time:serial)` stamp, and that stamp is what groups them into one event. `time` is unix seconds with milliseconds, `serial` restarts at every boot.
+
+this is what `python3 --version` typed by `speuser` looks like, trimmed for width:
+
+~~~text
+type=SYSCALL   msg=audit(1787762101.420:966): arch=c000003e syscall=59 success=yes exit=0 ppid=4300 pid=4321 auid=1001 uid=1001 tty=pts0 ses=3 comm="python3" exe="/usr/bin/python3.12" key="spe_cli"  ARCH=x86_64 SYSCALL=execve AUID="speuser" UID="speuser"
+type=EXECVE    msg=audit(1787762101.420:966): argc=2 a0="python3" a1="--version"
+type=CWD       msg=audit(1787762101.420:966): cwd="/home/speuser/spe-data-lab"
+type=PATH      msg=audit(1787762101.420:966): item=0 name="/usr/bin/python3" mode=0100755 ouid=0 ogid=0
+type=PROCTITLE msg=audit(1787762101.420:966): proctitle=707974686F6E33002D2D76657273696F6E
+~~~
+
+the fields we care about:
+
+- `type`: which kind of line this is. `SYSCALL` carries who and what, `EXECVE` the arguments, `CWD` the directory, `PATH` the binary, `PROCTITLE` the command line hex-encoded.
+- `auid` / `AUID`: the login identity. it survives `sudo`, so a root shell still says which human logged in.
+- `uid` / `UID`: the account the process is running as right now.
+- `ses`: the login session number, handy to group everything one person did in one session.
+- `pid` / `ppid`: the process and its parent.
+- `exe`, `comm`: the binary path and its short name.
+- `key`: the tag from our rule, `spe_cli`, which is what `ausearch -k spe_cli` filters on.
+- `a0`, `a1`, ...: the arguments, one field each. there is no array.
+- the uppercase fields at the end (`AUID="speuser"`, `SYSCALL=execve`) are the `ENRICHED` translations of the numeric ones. they sit after a `0x1D` control character on the same line.
+
+a login looks different because it comes from PAM, not from a rule. one line, and the interesting part is inside `msg='...'`:
+
+~~~text
+type=USER_START msg=audit(1787762050.101:940): pid=4210 uid=0 auid=1001 ses=3 msg='op=PAM:session_open acct="speuser" exe="/usr/sbin/sshd" hostname=203.0.113.10 addr=203.0.113.10 terminal=ssh res=success'  UID="root" AUID="speuser"
+~~~
+
+here `acct` is who logged in, `exe` and `terminal` say through what (`sshd` over `ssh`, `cron` for a scheduled job, `xrdp-sesman` for the desktop), and `res` whether it worked.
+
+and keystrokes are `TTY` lines with the typed bytes hex-encoded in `data`:
+
+~~~text
+type=TTY msg=audit(1787762110.330:951): tty pid=4321 uid=1001 auid=1001 ses=3 major=136 minor=0 comm="bash" data=6364207E2F7370652D646174612D6C61620A
+~~~
+
+# reading it
+
+don't parse the file by hand. `ausearch` groups the lines of an event and, with `-i`, decodes the hex and resolves the numbers into names:
+
+~~~bash
+sudo ausearch -k spe_cli -i --start recent     # commands humans ran
+sudo aureport -l -i --start recent             # logins
+sudo aureport --tty -i --start recent          # what was typed
+~~~
+
+the file is `0600 root:root`, so all of this needs `sudo`.
