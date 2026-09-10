@@ -2,7 +2,8 @@ project_id = "YOUR_GCP_PROJECT_ID"
 region     = "us-central1"
 zone       = "us-central1-c"
 
-spe_id       = "spe-demo-006-gcp"
+spe_id                     = "spe-demo-006-gcp"
+heartbeat_interval_seconds = 30
 vm_size      = "e2-medium"
 disk_size_gb = 30
 disk_type    = "pd-standard"

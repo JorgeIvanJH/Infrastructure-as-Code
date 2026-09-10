@@ -94,6 +94,8 @@ the field names have dots in them, so in `jq` they need quoting: `.["id.resp_h"]
 
 a zero in the byte counts is not an error by itself, it is what a rejected or unanswered attempt looks like.
 
+one line you will always see: the heartbeat agent checks the internet every interval with a TCP handshake to `1.1.1.1:443` (then `8.8.8.8:443` if that fails), so expect one such connection per heartbeat, `SF` with the internet on and `S0` with it off. that is the SPE checking on itself, not a researcher.
+
 # reading it
 
 ~~~bash

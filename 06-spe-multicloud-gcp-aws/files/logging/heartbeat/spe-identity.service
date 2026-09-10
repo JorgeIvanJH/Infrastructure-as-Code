@@ -1,0 +1,13 @@
+[Unit]
+Description=Read the SPE identity Terraform attached to this instance
+Documentation=file:/usr/local/sbin/spe-identity
+Wants=network-online.target
+After=network-online.target spe-internet-restore.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/spe-identity
+
+[Install]
+WantedBy=multi-user.target

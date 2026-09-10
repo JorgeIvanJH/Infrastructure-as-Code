@@ -40,7 +40,7 @@ Both images contain the complete Lesson 5 SPE:
 - XFCE, xrdp, JupyterLab, RStudio, and the hepatitis data examples.
 - The Python heartbeat systemd service.
 - The `spe-internet` outbound-control command.
-- auditd, `pam_tty_audit`, Laurel, Zeek, and local log rotation.
+- auditd, `pam_tty_audit`, Zeek, and local log rotation.
 
 The contents of `data`, `environments`, `examples`, `files`, and `scripts` are
 the shared image recipe. I should change a shared component once and test both
@@ -274,6 +274,7 @@ Both roots use the same important interface:
 | `disk_type` | Provider-specific disk performance class |
 | `ssh_source_cidr` | One address allowed to reach TCP 22 |
 | `rdp_source_cidr` | Guacamole gateway address allowed to reach TCP 3389 |
+| `heartbeat_interval_seconds` | Seconds between heartbeats, read by the VM at boot from instance metadata |
 
 The location and network variables are also exposed because their valid shape
 differs by cloud.
@@ -343,8 +344,7 @@ Inside each SPE, configure the desktop account at runtime:
 
 ~~~bash
 sudo passwd speuser
-sudo systemctl is-active xrdp spe-monitoring-agent auditd spe-network-audit
-sudo pgrep --list-full laurel
+sudo systemctl is-active xrdp spe-monitoring-agent auditd zeek
 ~~~
 
 No reusable desktop password is stored in either image or Terraform state.
@@ -386,20 +386,22 @@ Perform this check in both clouds:
 ~~~bash
 hostname
 python3 --version
-sudo systemctl is-enabled xrdp spe-monitoring-agent auditd spe-network-audit
+sudo systemctl is-enabled xrdp spe-monitoring-agent auditd zeek zeek-cron.timer
 sudo spe-internet status
-sudo tail -n 1 /var/log/spe-audit/os.jsonl | jq .
+sudo tail -n 1 /var/log/audit/audit.log
 sudo tail -n 1 /var/log/spe-audit/network.jsonl | jq .
 find ~/spe-data-lab -maxdepth 2 -type f | sort
 ~~~
 
 Then use the graphical desktop to open the Jupyter notebook and RStudio project
 as in Lesson 5. Exercise `spe-internet off` and `on`, create a short HTTPS
-connection, inspect both JSONL logs, and reboot. The acceptance test is equal
+connection, inspect both audit logs, and reboot. The acceptance test is equal
 behavior, not identical cloud IDs or background log events.
 
 The detailed application and audit-log instructions remain in Lesson 5 and in
-`files/AUDIT-LOG-GUIDE.md`.
+`files/logging/AUDIT-LOG-GUIDE.md`. How the heartbeat and both audit streams are
+produced, stored, and rotated, and what a future off-VM exporter must account
+for, is explained in `files/logging/TELEMETRY-PIPELINE-GUIDE.md`.
 
 ## 10. Change hardware without changing the SPE recipe
 

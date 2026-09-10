@@ -1,10 +1,15 @@
 [Unit]
 Description=SPE monitoring agent
+# The agent needs the identity spe-identity read from instance metadata. If
+# that step failed there is no heartbeat, rather than one with made-up values.
+Requires=spe-identity.service
+After=spe-identity.service
 
 [Service]
 Type=simple
 User=terraform
 Group=terraform
+EnvironmentFile=/etc/spe/identity.env
 ExecStart=/usr/bin/python3 -u /opt/spe-agent/spe-monitoring-agent.py
 StandardOutput=journal
 StandardError=journal

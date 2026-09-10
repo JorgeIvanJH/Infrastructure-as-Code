@@ -76,7 +76,11 @@ resource "google_compute_instance" "spe" {
   }
 
   # This learning image contains the public half of the local tf-packer key.
+  # The spe-* keys are read at boot by spe-identity; the image itself carries
+  # no SPE identity.
   metadata = {
-    enable-oslogin = "FALSE"
+    enable-oslogin         = "FALSE"
+    spe-id                 = var.spe_id
+    spe-heartbeat-interval = tostring(var.heartbeat_interval_seconds)
   }
 }

@@ -1,7 +1,8 @@
 region            = "us-east-1"
 availability_zone = null
 
-spe_id       = "spe-demo-006-aws"
+spe_id                     = "spe-demo-006-aws"
+heartbeat_interval_seconds = 30
 vm_size      = "c7i-flex.large"
 disk_size_gb = 30
 disk_type    = "gp3"

@@ -1,0 +1,17 @@
+# Who may talk to the instance metadata service. spe-internet loads this table
+# in both modes, so it holds whether the internet is on or off.
+#
+# The metadata service hands out this instance's identity and, if a cloud role
+# is attached, its credentials. Only three local identities need it:
+#   root       the boot-time spe-identity step and the cloud guest agents
+#   terraform  the administrator
+#   _chrony    the time daemon, which on GCP syncs against this address
+# Everyone else, the researcher included, is refused immediately.
+table inet spe_metadata {
+    chain output {
+        type filter hook output priority filter - 10; policy accept;
+
+        ip daddr 169.254.169.254 meta skuid { root, terraform, _chrony } counter accept
+        ip daddr 169.254.169.254 counter reject
+    }
+}

@@ -26,6 +26,17 @@ variable "spe_id" {
   }
 }
 
+variable "heartbeat_interval_seconds" {
+  description = "Seconds between heartbeat records. Attached to the instance as metadata and read by the SPE at boot."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.heartbeat_interval_seconds >= 5 && var.heartbeat_interval_seconds <= 3600 && floor(var.heartbeat_interval_seconds) == var.heartbeat_interval_seconds
+    error_message = "Use a whole number of seconds between 5 and 3600."
+  }
+}
+
 variable "vm_size" {
   description = "GCP machine type. e2-medium provides 2 vCPUs and 4 GB of memory."
   type        = string

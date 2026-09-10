@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Read the values Terraform attached to this instance and write them to
+# /etc/spe/identity.env for the units that need them. Runs once at boot as
+# root, which is one of the three identities allowed to reach the metadata
+# service. The image carries no SPE identity; this is where it arrives.
+readonly OUTPUT_DIRECTORY="/etc/spe"
+readonly OUTPUT_FILE="${OUTPUT_DIRECTORY}/identity.env"
+readonly METADATA_HOST="169.254.169.254"
+readonly ATTEMPTS=10
+readonly CURL=(curl --silent --fail --max-time 5)
+
+detect_cloud() {
+  local product vendor bios_vendor
+  product="$(cat /sys/class/dmi/id/product_name 2>/dev/null || true)"
+  vendor="$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null || true)"
+  bios_vendor="$(cat /sys/class/dmi/id/bios_vendor 2>/dev/null || true)"
+
+  if [[ "$product" == "Google Compute Engine" ]]; then
+    echo "gcp"
+  elif [[ "$vendor" == "Amazon EC2" || "$bios_vendor" == "Amazon EC2" ]]; then
+    echo "aws"
+  else
+    echo "Unknown cloud: product '${product}', vendor '${vendor}'." >&2
+    exit 1
+  fi
+}
+
+# GCP: one header proves the request was made on purpose by local code.
+gcp_get() {
+  "${CURL[@]}" -H 'Metadata-Flavor: Google' \
+    "http://${METADATA_HOST}/computeMetadata/v1/$1"
+}
+
+# AWS: IMDSv2 needs a short-lived session token first.
+aws_token=""
+aws_get() {
+  if [[ -z "$aws_token" ]]; then
+    aws_token="$("${CURL[@]}" -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' \
+      "http://${METADATA_HOST}/latest/api/token")"
+  fi
+  "${CURL[@]}" -H "X-aws-ec2-metadata-token: ${aws_token}" \
+    "http://${METADATA_HOST}/latest/$1"
+}
+
+# The metadata service can lag the network by a moment at boot.
+with_retries() {
+  local attempt
+  for attempt in $(seq 1 "$ATTEMPTS"); do
+    if "$@"; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+read_identity() {
+  local cloud="$1"
+  case "$cloud" in
+    gcp)
+      spe_id="$(with_retries gcp_get instance/attributes/spe-id)"
+      heartbeat_interval="$(with_retries gcp_get instance/attributes/spe-heartbeat-interval)"
+      instance_id="$(with_retries gcp_get instance/id)"
+      # The zone comes back as projects/NNN/zones/us-central1-c.
+      region="$(with_retries gcp_get instance/zone | awk -F/ '{ print $NF }')"
+      ;;
+    aws)
+      spe_id="$(with_retries aws_get meta-data/tags/instance/spe-id)"
+      heartbeat_interval="$(with_retries aws_get meta-data/tags/instance/spe-heartbeat-interval)"
+      instance_id="$(with_retries aws_get meta-data/instance-id)"
+      region="$(with_retries aws_get meta-data/placement/region)"
+      ;;
+  esac
+}
+
+# Each value is checked against a strict shape before it is written, so the
+# environment file can never carry anything a shell or systemd would misread.
+require_shape() {
+  local name="$1" value="$2" pattern="$3"
+  if [[ ! "$value" =~ $pattern ]]; then
+    echo "${name} has an unexpected value: '${value}'." >&2
+    exit 1
+  fi
+}
+
+write_identity() {
+  local temporary_file
+  install -d -o root -g root -m 0755 "$OUTPUT_DIRECTORY"
+  temporary_file="$(mktemp "${OUTPUT_DIRECTORY}/identity.env.XXXXXX")"
+  cat >"$temporary_file" <<EOF
+SPE_ID=${spe_id}
+SPE_HEARTBEAT_INTERVAL=${heartbeat_interval}
+SPE_CLOUD=${cloud}
+SPE_INSTANCE_ID=${instance_id}
+SPE_REGION=${region}
+EOF
+  chmod 0644 "$temporary_file"
+  mv "$temporary_file" "$OUTPUT_FILE"
+}
+
+cloud="$(detect_cloud)"
+spe_id="" heartbeat_interval="" instance_id="" region=""
+if ! read_identity "$cloud"; then
+  echo "The instance metadata does not carry spe-id and spe-heartbeat-interval. Was this VM created by the lesson's Terraform?" >&2
+  exit 1
+fi
+
+require_shape "spe-id" "$spe_id" '^[a-z][a-z0-9-]{1,38}[a-z0-9]$'
+require_shape "spe-heartbeat-interval" "$heartbeat_interval" '^[0-9]{1,5}$'
+require_shape "instance id" "$instance_id" '^[A-Za-z0-9-]+$'
+require_shape "region" "$region" '^[a-z0-9-]+$'
+
+write_identity
+echo "SPE identity: ${spe_id} on ${cloud} (${instance_id}, ${region}), heartbeat every ${heartbeat_interval}s"

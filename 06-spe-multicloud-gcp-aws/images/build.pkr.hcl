@@ -14,13 +14,23 @@ build {
   }
 
   provisioner "file" {
-    source      = "../files/spe-monitoring-agent.py"
+    source      = "../files/logging/heartbeat/spe-monitoring-agent.py"
     destination = "/tmp/spe-monitoring-agent.py"
   }
 
   provisioner "file" {
-    source      = "../files/spe-monitoring-agent.service"
+    source      = "../files/logging/heartbeat/spe-monitoring-agent.service"
     destination = "/tmp/spe-monitoring-agent.service"
+  }
+
+  provisioner "file" {
+    source      = "../files/logging/heartbeat/spe-identity"
+    destination = "/tmp/spe-identity"
+  }
+
+  provisioner "file" {
+    source      = "../files/logging/heartbeat/spe-identity.service"
+    destination = "/tmp/spe-identity.service"
   }
 
   provisioner "file" {
@@ -89,38 +99,63 @@ build {
   }
 
   provisioner "file" {
-    source      = "../files/spe-audit.rules"
-    destination = "/tmp/spe-audit.rules"
+    source      = "../files/spe-metadata.nft"
+    destination = "/tmp/spe-metadata.nft"
   }
 
   provisioner "file" {
-    source      = "../files/spe-pam-tty-audit"
-    destination = "/tmp/spe-pam-tty-audit"
+    source      = "../files/logging/auditd/50-spe.rules"
+    destination = "/tmp/50-spe.rules"
   }
 
   provisioner "file" {
-    source      = "../files/spe-laurel.toml"
-    destination = "/tmp/spe-laurel.toml"
+    source      = "../files/logging/auditd/spe-tty-audit"
+    destination = "/tmp/spe-tty-audit"
   }
 
   provisioner "file" {
-    source      = "../files/spe-network-audit.zeek"
-    destination = "/tmp/spe-network-audit.zeek"
+    source      = "../files/logging/auditd/auditd.conf"
+    destination = "/tmp/auditd.conf"
   }
 
   provisioner "file" {
-    source      = "../files/spe-network-audit"
-    destination = "/tmp/spe-network-audit"
+    source      = "../files/logging/zeek/local.zeek"
+    destination = "/tmp/local.zeek"
   }
 
   provisioner "file" {
-    source      = "../files/spe-network-audit.service"
-    destination = "/tmp/spe-network-audit.service"
+    source      = "../files/logging/zeek/node.cfg"
+    destination = "/tmp/node.cfg"
   }
 
   provisioner "file" {
-    source      = "../files/spe-audit-logrotate"
-    destination = "/tmp/spe-audit-logrotate"
+    source      = "../files/logging/zeek/networks.cfg"
+    destination = "/tmp/networks.cfg"
+  }
+
+  provisioner "file" {
+    source      = "../files/logging/zeek/zeekctl.cfg"
+    destination = "/tmp/zeekctl.cfg"
+  }
+
+  provisioner "file" {
+    source      = "../files/logging/zeek/zeek-set-interface"
+    destination = "/tmp/zeek-set-interface"
+  }
+
+  provisioner "file" {
+    source      = "../files/logging/zeek/zeek.service"
+    destination = "/tmp/zeek.service"
+  }
+
+  provisioner "file" {
+    source      = "../files/logging/zeek/zeek-cron.service"
+    destination = "/tmp/zeek-cron.service"
+  }
+
+  provisioner "file" {
+    source      = "../files/logging/zeek/zeek-cron.timer"
+    destination = "/tmp/zeek-cron.timer"
   }
 
   provisioner "shell" {

@@ -5,8 +5,10 @@ set -euo pipefail
 readonly STATE_DIRECTORY="/var/lib/spe-internet"
 readonly STATE_FILE="${STATE_DIRECTORY}/mode"
 readonly RULES_FILE="/etc/spe-internet/disabled.nft"
+readonly METADATA_RULES_FILE="/etc/spe-internet/metadata.nft"
 readonly TABLE_FAMILY="inet"
 readonly TABLE_NAME="spe_egress"
+readonly METADATA_TABLE_NAME="spe_metadata"
 
 show_usage() {
   cat <<'EOF'
@@ -28,6 +30,40 @@ require_root() {
 table_exists() {
   nft list table "$TABLE_FAMILY" "$TABLE_NAME" >/dev/null 2>&1
 }
+# Check if the metadata access table exists
+metadata_table_exists() {
+  nft list table "$TABLE_FAMILY" "$METADATA_TABLE_NAME" >/dev/null 2>&1
+}
+# Load a rules file as one atomic batch, replacing the named table if present.
+# A bad rule cannot remove the currently active table.
+load_table() {
+  local table_name="$1"
+  local rules_file="$2"
+  local rules_batch
+
+  rules_batch="$(mktemp "/run/spe-internet.XXXXXX.nft")"
+
+  if nft list table "$TABLE_FAMILY" "$table_name" >/dev/null 2>&1; then
+    printf 'delete table %s %s\n' "$TABLE_FAMILY" "$table_name" >"$rules_batch"
+  fi
+
+  printf 'include "%s"\n' "$rules_file" >>"$rules_batch"
+
+  if ! nft --check --file "$rules_batch"; then
+    rm -f "$rules_batch"
+    exit 1
+  fi
+  if ! nft --file "$rules_batch"; then
+    rm -f "$rules_batch"
+    exit 1
+  fi
+  rm -f "$rules_batch"
+}
+# The metadata access policy is independent of the mode and is (re)loaded on
+# every mode change and at boot, so it is in force whenever the VM is up.
+apply_metadata_policy() {
+  load_table "$METADATA_TABLE_NAME" "$METADATA_RULES_FILE"
+}
 # Save the current mode to the state file
 save_mode() {
   local mode="$1"
@@ -40,6 +76,8 @@ save_mode() {
 }
 # Enable internet access
 internet_on() {
+  apply_metadata_policy
+
   if table_exists; then
     nft delete table "$TABLE_FAMILY" "$TABLE_NAME"
   fi
@@ -49,26 +87,8 @@ internet_on() {
 }
 # Disable internet access
 internet_off() {
-  local rules_batch
-
-  rules_batch="$(mktemp /run/spe-internet.XXXXXX.nft)"
-
-  if table_exists; then
-    printf 'delete table %s %s\n' "$TABLE_FAMILY" "$TABLE_NAME" >"$rules_batch"
-  fi
-
-  printf 'include "%s"\n' "$RULES_FILE" >>"$rules_batch"
-
-  # Checking and loading one batch makes replacement atomic. A bad future allow-list rule cannot remove the currently active protection.
-  if ! nft --check --file "$rules_batch"; then
-    rm -f "$rules_batch"
-    exit 1
-  fi
-  if ! nft --file "$rules_batch"; then
-    rm -f "$rules_batch"
-    exit 1
-  fi
-  rm -f "$rules_batch"
+  apply_metadata_policy
+  load_table "$TABLE_NAME" "$RULES_FILE"
 
   save_mode "off"
   echo "Internet access: disabled"
@@ -78,6 +98,7 @@ internet_off() {
 internet_status() {
   local effective_mode
   local saved_mode="unknown"
+  local metadata_policy="missing"
 
   if table_exists; then
     effective_mode="disabled"
@@ -89,12 +110,21 @@ internet_status() {
     saved_mode="$(<"$STATE_FILE")"
   fi
 
+  if metadata_table_exists; then
+    metadata_policy="loaded"
+  fi
+
   echo "Internet access: ${effective_mode}"
   echo "Saved mode: ${saved_mode}"
+  echo "Metadata access policy: ${metadata_policy}"
 
   if [[ "$effective_mode" == "enabled" && "$saved_mode" == "off" ]] ||
     [[ "$effective_mode" == "disabled" && "$saved_mode" == "on" ]]; then
     echo "Warning: the effective mode does not match the saved mode." >&2
+    return 1
+  fi
+  if [[ "$metadata_policy" == "missing" ]]; then
+    echo "Warning: the metadata access policy is not loaded." >&2
     return 1
   fi
 }

@@ -52,15 +52,36 @@ sudo install -o root -g root -m 0644 \
 sudo install -o root -g root -m 0644 \
   /tmp/spe-monitoring-agent.service \
   /etc/systemd/system/spe-monitoring-agent.service
-sudo rm -f /tmp/spe-monitoring-agent.py /tmp/spe-monitoring-agent.service
+# The identity step runs at boot as root, reads what Terraform attached to the
+# instance, and writes /etc/spe/identity.env for the agent. Nothing about a
+# specific SPE is written into the image.
+sudo install -d -o root -g root -m 0755 /etc/spe
+sudo install -o root -g root -m 0755 \
+  /tmp/spe-identity \
+  /usr/local/sbin/spe-identity
+sudo install -o root -g root -m 0644 \
+  /tmp/spe-identity.service \
+  /etc/systemd/system/spe-identity.service
+sudo rm -f \
+  /tmp/spe-monitoring-agent.py \
+  /tmp/spe-monitoring-agent.service \
+  /tmp/spe-identity \
+  /tmp/spe-identity.service
 
-# Activate the systemd service and verify that it is enabled.
+# Verify both units and both programs, then enable them. The identity step
+# cannot run here: the build VM carries no SPE metadata, and that is the point.
 sudo systemctl daemon-reload
-sudo systemd-analyze verify /etc/systemd/system/spe-monitoring-agent.service
-sudo systemctl enable spe-monitoring-agent.service
+sudo systemd-analyze verify \
+  /etc/systemd/system/spe-identity.service \
+  /etc/systemd/system/spe-monitoring-agent.service
+bash -n /usr/local/sbin/spe-identity
+sudo python3 -m py_compile /opt/spe-agent/spe-monitoring-agent.py
+sudo rm -rf /opt/spe-agent/__pycache__
+sudo systemctl enable spe-identity.service spe-monitoring-agent.service
 
 # Verify the main packages and both services before Packer saves the image.
 python3 --version
 dpkg-query --show xfce4 xrdp
+sudo systemctl is-enabled spe-identity.service
 sudo systemctl is-enabled spe-monitoring-agent.service
 sudo systemctl is-enabled xrdp.service

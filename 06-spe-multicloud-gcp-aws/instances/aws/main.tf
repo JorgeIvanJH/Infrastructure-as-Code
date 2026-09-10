@@ -118,9 +118,12 @@ resource "aws_instance" "spe" {
   vpc_security_group_ids      = [aws_security_group.spe.id]
   associate_public_ip_address = true
 
+  # Tags are exposed through the metadata endpoint so spe-identity can read
+  # the spe-* values at boot; the image itself carries no SPE identity.
   metadata_options {
-    http_endpoint = "enabled"
-    http_tokens   = "required"
+    http_endpoint          = "enabled"
+    http_tokens            = "required"
+    instance_metadata_tags = "enabled"
   }
 
   root_block_device {
@@ -136,10 +139,12 @@ resource "aws_instance" "spe" {
   }
 
   tags = {
-    Name      = var.spe_id
-    Component = "spe"
-    ManagedBy = "terraform"
-    Purpose   = "learning"
+    Name                     = var.spe_id
+    Component                = "spe"
+    ManagedBy                = "terraform"
+    Purpose                  = "learning"
+    "spe-id"                 = var.spe_id
+    "spe-heartbeat-interval" = tostring(var.heartbeat_interval_seconds)
   }
 
   depends_on = [aws_route.internet, aws_route_table_association.spe]
