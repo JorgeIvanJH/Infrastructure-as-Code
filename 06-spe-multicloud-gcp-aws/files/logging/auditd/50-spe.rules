@@ -1,0 +1,11 @@
+# OS Auditing Configuration file
+
+# Records execution attempts made by 64-bit and 32-bit programs when the originating login user has an audit UID of 1000 or higher:
+#   -a always,exit: Always create an audit event when a matching system call finishes.
+#   -F arch=b64: Apply the rule to the 64-bit/32-bit syscall ABI.
+#   -S execve,execveat: Watch the two system calls used to execute programs.
+#   -F auid>=1000: Include sessions originally logged in as users with audit UID 1000 or higher.
+#   -F auid!=unset: Exclude processes that have no established login identity, normally system daemons.
+#   -k spe_cli: Tag matching events with the searchable key spe_cli.
+-a always,exit -F arch=b64 -S execve,execveat -F auid>=1000 -F auid!=unset -k spe_cli
+-a always,exit -F arch=b32 -S execve,execveat -F auid>=1000 -F auid!=unset -k spe_cli

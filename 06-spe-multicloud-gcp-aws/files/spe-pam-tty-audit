@@ -1,4 +1,0 @@
-# Capture interactive terminal input for the two human accounts in this lesson.
-# log_passwd is deliberately omitted, so input entered while terminal echo is
-# disabled is not intentionally recorded.
-session required pam_tty_audit.so disable=* enable=speuser,terraform

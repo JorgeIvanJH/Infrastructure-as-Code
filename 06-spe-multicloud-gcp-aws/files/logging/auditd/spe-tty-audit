@@ -1,0 +1,7 @@
+# OS Auditing Configuration file
+# Enables PAM-based terminal (TTY) auditing for every user session, including
+# root shells opened through sudo. Only sessions with a terminal produce TTY
+# records, so daemon sessions such as cron add nothing.
+# log_passwd is deliberately omitted, so input entered while terminal echo is
+# disabled is not intentionally recorded.
+session required pam_tty_audit.so enable=*
