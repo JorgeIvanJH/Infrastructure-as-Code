@@ -64,42 +64,42 @@ build {
   }
 
   provisioner "file" {
-    source      = "../files/spe-jupyter"
+    source      = "../files/desktop/spe-jupyter"
     destination = "/tmp/spe-jupyter"
   }
 
   provisioner "file" {
-    source      = "../files/spe-jupyter.desktop"
+    source      = "../files/desktop/spe-jupyter.desktop"
     destination = "/tmp/spe-jupyter.desktop"
   }
 
   provisioner "file" {
-    source      = "../files/spe-rstudio.desktop"
+    source      = "../files/desktop/spe-rstudio.desktop"
     destination = "/tmp/spe-rstudio.desktop"
   }
 
   provisioner "file" {
-    source      = "../files/spe-internet"
+    source      = "../files/internet-control/spe-internet"
     destination = "/tmp/spe-internet"
   }
 
   provisioner "file" {
-    source      = "../files/spe-internet-disabled.nft"
+    source      = "../files/internet-control/spe-internet-disabled.nft"
     destination = "/tmp/spe-internet-disabled.nft"
   }
 
   provisioner "file" {
-    source      = "../files/spe-internet-allowlist.nft"
+    source      = "../files/internet-control/spe-internet-allowlist.nft"
     destination = "/tmp/spe-internet-allowlist.nft"
   }
 
   provisioner "file" {
-    source      = "../files/spe-internet-restore.service"
+    source      = "../files/internet-control/spe-internet-restore.service"
     destination = "/tmp/spe-internet-restore.service"
   }
 
   provisioner "file" {
-    source      = "../files/spe-metadata.nft"
+    source      = "../files/internet-control/spe-metadata.nft"
     destination = "/tmp/spe-metadata.nft"
   }
 
