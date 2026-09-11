@@ -10,10 +10,14 @@ table inet spe_egress {
         ct state established,related counter accept
 
         # Keep the cloud guest environment healthy. GCP, AWS, and Azure use
-        # this link-local address for VM metadata. It is not a route to the
-        # general internet. Which local users may use it is decided in
+        # this link-local address for the VM metadata API (HTTP) and GCP also
+        # serves time from it. Neither is a route to the general internet.
+        # Which local users may use the API is decided in
         # /etc/spe-internet/metadata.nft, which applies in both modes.
-        ip daddr 169.254.169.254 counter accept
+        # DNS is deliberately not allowed: on GCP this address is also the
+        # resolver, and a sealed SPE must not be able to resolve names.
+        ip daddr 169.254.169.254 tcp dport 80 counter accept
+        ip daddr 169.254.169.254 udp dport 123 counter accept
 
         # AWS serves time from a second link-local address. Accurate clocks
         # keep the audit timestamps trustworthy in either mode.

@@ -4,8 +4,8 @@ set -euo pipefail
 
 # Read the values Terraform attached to this instance and write them to
 # /etc/spe/identity.env for the units that need them. Runs once at boot as
-# root, which is one of the three identities allowed to reach the metadata
-# service. The image carries no SPE identity; this is where it arrives.
+# root, one of the two identities allowed to use the metadata API. The image
+# carries no SPE identity; this is where it arrives.
 readonly OUTPUT_DIRECTORY="/etc/spe"
 readonly OUTPUT_FILE="${OUTPUT_DIRECTORY}/identity.env"
 readonly METADATA_HOST="169.254.169.254"

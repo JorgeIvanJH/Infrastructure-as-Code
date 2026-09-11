@@ -124,7 +124,8 @@ resync them to the lesson 05 wording.
 In lesson 06, everything that produces telemetry lives under
 [files/logging/](06-spe-multicloud-gcp-aws/files/logging/), split by producer: `auditd/` (rules and
 PAM include), `zeek/` (ZeekControl `node.cfg`, `zeekctl.cfg`, `networks.cfg`, site policy, interface script, units and timer), and `heartbeat/` (agent and
-unit). The three telemetry guides sit at the top of that folder. The rest of `files/` is split the same way: `internet-control/` (the `spe-internet` toggle, its nftables rule files, the metadata access table, and the restore unit) and `desktop/` (the JupyterLab launcher and the two XFCE menu entries). Formerly described as desktop,
+unit). Each producer folder has a README on how its stream is produced, stored, and read, and
+`AUDIT-LOG-GUIDE.md` at the top of the folder shows how to match the streams by time. The rest of `files/` is split the same way: `internet-control/` (the `spe-internet` toggle, its nftables rule files, the metadata access table, and the restore unit) and `desktop/` (the JupyterLab launcher and the two XFCE menu entries). Formerly described as desktop,
 launchers, and internet control. The build template's upload `source` paths point into these
 subfolders, so a moved file needs a matching edit there.
 
@@ -165,7 +166,8 @@ in Terraform files, or in Terraform state. A third account, `spe-netaudit`, is a
 user that runs Zeek and owns `/var/log/spe-audit`. The image carries no SPE identity: at boot,
 `spe-identity` reads `spe-id` and `spe-heartbeat-interval` from instance metadata into
 `/etc/spe/identity.env`, which the heartbeat unit requires and loads. An always-loaded nftables
-table `spe_metadata` limits the metadata endpoint to root, `terraform`, and `_chrony`.
+table `spe_metadata` limits new connections (the SYN only) to the metadata API (tcp/80) to root and
+`terraform`.
 
 Access path: browser to Guacamole in Docker on the laptop, then RDP on 3389, then xrdp, then XFCE.
 The cloud firewall admits SSH and RDP from a single `/32`. Inside the VM,
@@ -174,13 +176,11 @@ The cloud firewall admits SSH and RDP from a single `/32`. Inside the VM,
 boot. Audit output is two local files: raw auditd records in `/var/log/audit/audit.log`, several
 lines per event, and Zeek connection metadata as JSON Lines in `/var/log/spe-audit`. Laurel, which
 used to aggregate the auditd records into JSON, was removed on 2026-09-10 so the two tools can be
-studied on their own; it may return as a design change. Two guides cover this:
+studied on their own; it may return as a design change.
 [AUDIT-LOG-GUIDE.md](06-spe-multicloud-gcp-aws/files/logging/AUDIT-LOG-GUIDE.md) explains how to read the
-fields, and [TELEMETRY-PIPELINE-GUIDE.md](06-spe-multicloud-gcp-aws/files/logging/TELEMETRY-PIPELINE-GUIDE.md)
-explains how each record is produced, stored, rotated, and what an off-VM exporter must account for.
-[TELEMETRY-DESIGN-CHANGES.md](06-spe-multicloud-gcp-aws/files/logging/TELEMETRY-DESIGN-CHANGES.md) is the
-numbered backlog of agreed changes (C1 to C18) toward exporting these streams over REST; check it
-before changing any service account, unit file, or audit path.
+fields and match the streams by time; the README in each producer folder explains how its records
+are produced, stored, and rotated. Exporting these streams off the VM is future work with no design
+document yet.
 
 ## Conventions
 

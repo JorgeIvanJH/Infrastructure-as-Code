@@ -104,4 +104,4 @@ sudo aureport -l -i --start recent             # logins
 sudo aureport --tty -i --start recent          # what was typed
 ~~~
 
-the file is `0600 root:root`, so all of this needs `sudo`.
+the file is `0600 root:root`, so all of this needs `sudo`. one trap: when its stdin is a pipe, as in a cron job, a systemd unit, or the packer build, `ausearch` reads events from stdin instead of the log and answers `<no matches>`. add `--input-logs` there to force the log files; typed at an ssh prompt it is not needed.

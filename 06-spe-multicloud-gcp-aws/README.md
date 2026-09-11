@@ -88,10 +88,12 @@ The two native images are equivalent recipes, not the same binary image file.
 |   |-- compose.yaml
 |   `-- user-mapping.xml.example
 |-- scripts/
-|   |-- Invoke-WithAwsLogin.ps1       # gives Packer or Terraform renewable AWS login credentials
-|   |-- aws-login-credential-server.py
-|   |-- cleanup-image.sh              # removes temporary build users' SSH access and caches
-|   `-- setup*.sh                     # shared SPE installation scripts
+|   |-- aws-login/                    # gives Packer or Terraform renewable AWS login credentials
+|   |   |-- Invoke-WithAwsLogin.ps1
+|   |   `-- aws-login-credential-server.py
+|   `-- image/                        # shared SPE installation scripts, run by Packer in order
+|       |-- setup*.sh
+|       `-- cleanup-image.sh          # removes temporary build users' SSH access and caches
 |-- data/, environments/, examples/, files/
 |-- tf-packer       # local private key; ignored by Git
 `-- tf-packer.pub   # public key placed in both images; ignored by Git
@@ -406,9 +408,8 @@ connection, inspect both audit logs, and reboot. The acceptance test is equal
 behavior, not identical cloud IDs or background log events.
 
 The detailed application and audit-log instructions remain in Lesson 5 and in
-`files/logging/AUDIT-LOG-GUIDE.md`. How the heartbeat and both audit streams are
-produced, stored, and rotated, and what a future off-VM exporter must account
-for, is explained in `files/logging/TELEMETRY-PIPELINE-GUIDE.md`.
+`files/logging/AUDIT-LOG-GUIDE.md`. How each stream is produced, stored, and
+rotated is explained in the README of its own folder under `files/logging/`.
 
 ## 10. Change hardware without changing the SPE recipe
 

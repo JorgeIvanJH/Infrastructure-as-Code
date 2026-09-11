@@ -3,12 +3,29 @@
 set -euo pipefail
 
 # nftables is the Linux firewall used for this small outbound-control feature.
-# chrony keeps the clock, and its _chrony account is one of the three allowed
-# to reach the metadata service, so it must exist before the rules are checked.
+# chrony keeps the clock; accurate time keeps the audit timestamps trustworthy.
+# nss-myhostname answers the VM's own hostname without DNS, see below.
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
   chrony \
+  libnss-myhostname \
   nftables
+
+# The VM's own hostname must resolve without DNS. GCP sets it to a name only
+# the metadata resolver knows, so with the internet off every sudo waited for a
+# lookup that sealed mode drops. The package appends myhostname after dns;
+# it has to come before dns so no query is ever made for the VM's own name.
+sudo sed -i -E '/^hosts:/ { s/ myhostname//; s/ dns/ myhostname dns/ }' /etc/nsswitch.conf
+grep -Eq '^hosts:[[:space:]]+files myhostname dns' /etc/nsswitch.conf
+
+# GCP only: the guest environment ships its own logs to Cloud Logging and, with
+# the internet off, its shutdown job waits ten minutes for that before the VM
+# can reboot. The SPE keeps its logs on the VM. AWS has no such agent, so the
+# file is not written there.
+if command -v google_guest_agent >/dev/null; then
+  printf '[Core]\ncloud_logging_enabled = false\n' \
+    | sudo tee /etc/default/instance_configs.cfg >/dev/null
+fi
 
 sudo install -d -o root -g root -m 0755 \
   /etc/spe-internet \
@@ -42,9 +59,9 @@ sudo rm -f \
   /tmp/spe-internet-restore.service
 
 # Validate the firewall rules and the boot service before exercising the modes
-# below. The metadata rules name three accounts; nft resolves them at check
+# below. The metadata rules name two accounts; nft resolves them at check
 # time, so a missing account fails the build here.
-id root terraform _chrony >/dev/null
+id root terraform >/dev/null
 sudo nft --check --file /etc/spe-internet/disabled.nft
 sudo nft --check --file /etc/spe-internet/metadata.nft
 sudo systemctl daemon-reload
@@ -57,6 +74,8 @@ if curl --silent --head --connect-timeout 5 https://example.com >/dev/null 2>&1;
   echo "Internet-off validation failed: the new HTTPS request succeeded." >&2
   exit 1
 fi
+# The VM's own name must still resolve while sealed, with no DNS to ask.
+getent hosts "$(hostname)" >/dev/null
 echo "Internet-off validation passed."
 
 sudo /usr/local/sbin/spe-internet on
@@ -65,7 +84,9 @@ curl --fail --silent --show-error --head --connect-timeout 10 \
 echo "Internet-on validation passed."
 
 # The metadata policy holds while the internet is on. Any HTTP answer means the
-# endpoint was reachable; a refused connection means the policy applied.
+# API was reachable; a refused connection means the policy applied. Name
+# resolution must still work, because on GCP the same address is the resolver.
+getent hosts example.com >/dev/null
 if ! sudo curl --silent --output /dev/null --max-time 5 http://169.254.169.254/; then
   echo "Metadata validation failed: root cannot reach the metadata service." >&2
   exit 1

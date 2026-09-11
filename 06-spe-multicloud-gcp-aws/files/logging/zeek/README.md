@@ -84,7 +84,7 @@ the field names have dots in them, so in `jq` they need quoting: `.["id.resp_h"]
 | value | meaning |
 |---|---|
 | `SF` | normal: established and closed properly |
-| `S0` | attempt seen, nobody answered. typical for internet-off mode, where outbound packets are dropped |
+| `S0` | attempt seen, nobody answered. a remote host that did not reply; a sealed SPE's own attempts are dropped before zeek sees them, so they do not show up as `S0` |
 | `REJ` | attempt rejected by the other side |
 | `S1` | established, never saw it close (zeek was still watching when it stopped) |
 | `S2`, `S3` | established, one side tried to close, the other never replied |
@@ -94,7 +94,7 @@ the field names have dots in them, so in `jq` they need quoting: `.["id.resp_h"]
 
 a zero in the byte counts is not an error by itself, it is what a rejected or unanswered attempt looks like.
 
-one line you will always see: the heartbeat agent checks the internet every interval with a TCP handshake to `1.1.1.1:443` (then `8.8.8.8:443` if that fails), so expect one such connection per heartbeat, `SF` with the internet on and `S0` with it off. that is the SPE checking on itself, not a researcher.
+one line you will always see: the heartbeat agent checks the internet every interval with a TCP handshake to `1.1.1.1:443` (then `8.8.8.8:443` if that fails), so expect one such connection per heartbeat while the internet is on, zero bytes, `SF`. with the internet off the packets are dropped before they reach the interface and nothing is recorded. that is the SPE checking on itself, not a researcher.
 
 # reading it
 
@@ -106,4 +106,4 @@ sudo ls /var/log/spe-audit                                      # current/ plus 
 sudo zcat /var/log/spe-audit/*/network.*.log.gz | jq -r '[(.ts|todate), .["id.resp_h"], .["id.resp_p"], .conn_state] | @tsv'
 ~~~
 
-zeek only knows addresses and ports. it does not know which process or which user made the connection, and it logs IPs, not hostnames. matching a connection to a command is done by time against the auditd log, which is what [AUDIT-LOG-GUIDE.md](../AUDIT-LOG-GUIDE.md) walks through. how the whole thing is wired, rotated, and what an exporter must handle is in [TELEMETRY-PIPELINE-GUIDE.md](../TELEMETRY-PIPELINE-GUIDE.md).
+zeek only knows addresses and ports. it does not know which process or which user made the connection, and it logs IPs, not hostnames. matching a connection to a command is done by time against the auditd log, which is what [AUDIT-LOG-GUIDE.md](../AUDIT-LOG-GUIDE.md) walks through.

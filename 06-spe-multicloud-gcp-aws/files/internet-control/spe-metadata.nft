@@ -1,17 +1,28 @@
-# Who may talk to the instance metadata service. spe-internet loads this table
-# in both modes, so it holds whether the internet is on or off.
+# Who may talk to the instance metadata API. spe-internet loads this table in
+# both modes, so it holds whether the internet is on or off.
 #
-# The metadata service hands out this instance's identity and, if a cloud role
-# is attached, its credentials. Only three local identities need it:
+# The metadata API is HTTP on port 80 at 169.254.169.254. It hands out this
+# instance's identity and, if a cloud role is attached, its credentials. Only
+# two local identities need it:
 #   root       the boot-time spe-identity step and the cloud guest agents
 #   terraform  the administrator
-#   _chrony    the time daemon, which on GCP syncs against this address
 # Everyone else, the researcher included, is refused immediately.
+#
+# Only port 80 is restricted. On GCP the same address is also the VM's DNS
+# resolver (udp/tcp 53) and NTP server (udp 123); those are not the metadata
+# API and are governed by the internet mode instead, not by this table.
+#
+# Only the opening packet of a connection, the SYN, is judged. It is the one
+# packet that always belongs to a live socket with an owner. Once a program has
+# closed its socket the kernel still answers the other side on its behalf, and
+# those FIN and ACK replies have no owner to check; refusing them left the
+# metadata server retransmitting to closed ports for minutes and filled Zeek's
+# log with those retries.
 table inet spe_metadata {
     chain output {
         type filter hook output priority filter - 10; policy accept;
 
-        ip daddr 169.254.169.254 meta skuid { root, terraform, _chrony } counter accept
-        ip daddr 169.254.169.254 counter reject
+        ip daddr 169.254.169.254 tcp dport 80 tcp flags syn / syn,ack meta skuid { root, terraform } counter accept
+        ip daddr 169.254.169.254 tcp dport 80 tcp flags syn / syn,ack counter reject
     }
 }

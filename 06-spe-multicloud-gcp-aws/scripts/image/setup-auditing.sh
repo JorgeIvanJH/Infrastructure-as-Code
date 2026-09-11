@@ -133,11 +133,26 @@ if ! sudo -u spe-netaudit /opt/zeek/bin/zeekctl status | grep -q running; then
   exit 1
 fi
 
-# Create a short connection after Zeek starts so its JSON output can be checked.
-# The curl program itself is started by the build user, so it also proves that
-# the execve rule fires.
-curl --silent --show-error --output /dev/null --connect-timeout 5 https://example.com
-sleep 2
+# Create a short connection so Zeek's JSON output can be checked. zeekctl
+# reports the node running before Zeek has finished loading its scripts and
+# started capturing, so repeat the connection until it shows up in the live
+# log. The curl program itself is started by the build user, so it also proves
+# that the execve rule fires.
+for attempt in {1..15}; do
+  curl --silent --show-error --output /dev/null --connect-timeout 5 https://example.com
+  sleep 2
+  if sudo test -s /var/log/spe-audit/current/network.log; then
+    break
+  fi
+done
+if ! sudo test -s /var/log/spe-audit/current/network.log; then
+  echo "Zeek did not log the test connection." >&2
+  sudo ls -laR /var/log/spe-audit /opt/zeek/spool/zeek || true
+  sudo -u spe-netaudit /opt/zeek/bin/zeekctl status || true
+  sudo -u spe-netaudit /opt/zeek/bin/zeekctl diag || true
+  sudo journalctl --no-pager -u zeek.service -n 30 || true
+  exit 1
+fi
 # Stopping the node flushes its logs and archives them into LogDir/<date>/,
 # which exercises the same rotation path a running SPE uses every hour.
 sudo systemctl stop zeek.service
@@ -158,7 +173,10 @@ if ! sudo grep -q 'key="spe_cli"' /var/log/audit/audit.log || \
   sudo journalctl --no-pager -u auditd.service -u zeek.service -n 50 || true
   exit 1
 fi
-sudo ausearch -k spe_cli --start recent >/dev/null
+# ausearch is the reading tool; it must find the tagged events too. When its
+# stdin is a pipe, as it is under Packer, ausearch reads events from there
+# instead of the log; --input-logs forces the log files from auditd.conf.
+sudo ausearch --input-logs -k spe_cli >/dev/null
 sudo find /var/log/spe-audit -name 'network.*.log.gz' -exec zcat {} + \
   | tail -n 1 | jq --exit-status . >/dev/null
 
