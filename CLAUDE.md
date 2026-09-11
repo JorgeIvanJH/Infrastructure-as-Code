@@ -125,7 +125,7 @@ In lesson 06, everything that produces telemetry lives under
 [files/logging/](06-spe-multicloud-gcp-aws/files/logging/), split by producer: `auditd/` (rules and
 PAM include), `zeek/` (ZeekControl `node.cfg`, `zeekctl.cfg`, `networks.cfg`, site policy, interface script, units and timer), and `heartbeat/` (agent and
 unit). Each producer folder has a README on how its stream is produced, stored, and read, and
-`AUDIT-LOG-GUIDE.md` at the top of the folder shows how to match the streams by time. The rest of `files/` is split the same way: `internet-control/` (the `spe-internet` toggle, its nftables rule files, the metadata access table, and the restore unit) and `desktop/` (the JupyterLab launcher and the two XFCE menu entries). Formerly described as desktop,
+`AUDIT-LOG-GUIDE.md` at the top of the folder is a one-table index of those subfolders. The rest of `files/` is split the same way: `internet-control/` (the `spe-internet` toggle, its nftables rule files, the metadata access table, and the restore unit) and `desktop/` (the JupyterLab launcher and the two XFCE menu entries). Formerly described as desktop,
 launchers, and internet control. The build template's upload `source` paths point into these
 subfolders, so a moved file needs a matching edit there.
 
@@ -159,7 +159,8 @@ this pattern when adding a component.
 
 ### SPE runtime model
 
-Two accounts, split on purpose. The `terraform` account is the SSH administrator with passwordless
+[HOW-THE-SPE-WORKS.md](06-spe-multicloud-gcp-aws/HOW-THE-SPE-WORKS.md) is the plain-words version of
+this section with diagrams; keep the two in step. Two accounts, split on purpose. The `terraform` account is the SSH administrator with passwordless
 sudo and the baked-in public key. The `speuser` account owns the XFCE desktop, is created locked,
 and gets its password set manually over SSH after apply. No reusable password exists in the image,
 in Terraform files, or in Terraform state. A third account, `spe-netaudit`, is a no-login system
@@ -177,10 +178,10 @@ boot. Audit output is two local files: raw auditd records in `/var/log/audit/aud
 lines per event, and Zeek connection metadata as JSON Lines in `/var/log/spe-audit`. Laurel, which
 used to aggregate the auditd records into JSON, was removed on 2026-09-10 so the two tools can be
 studied on their own; it may return as a design change.
-[AUDIT-LOG-GUIDE.md](06-spe-multicloud-gcp-aws/files/logging/AUDIT-LOG-GUIDE.md) explains how to read the
-fields and match the streams by time; the README in each producer folder explains how its records
-are produced, stored, and rotated. Exporting these streams off the VM is future work with no design
-document yet.
+The README in each producer folder explains how its records are produced, stored, rotated, and read;
+[AUDIT-LOG-GUIDE.md](06-spe-multicloud-gcp-aws/files/logging/AUDIT-LOG-GUIDE.md) is the one-table
+index of those folders. Exporting these streams off the VM is future work with no design document
+yet.
 
 ## Conventions
 

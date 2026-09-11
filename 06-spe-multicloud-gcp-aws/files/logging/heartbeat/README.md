@@ -75,4 +75,4 @@ cat /etc/spe/identity.env                                        # the values th
 sudo systemctl status spe-identity spe-monitoring-agent          # both should be active
 ~~~
 
-the heartbeat is the only one of the three streams that already knows its `spe_id`. the two audit streams are described in [auditd/README.md](../auditd/README.md) and [zeek/README.md](../zeek/README.md), and [AUDIT-LOG-GUIDE.md](../AUDIT-LOG-GUIDE.md) shows how to read them together.
+the heartbeat is the only one of the three streams that already knows its `spe_id`. the two audit streams are described in [auditd/README.md](../auditd/README.md) and [zeek/README.md](../zeek/README.md); [AUDIT-LOG-GUIDE.md](../AUDIT-LOG-GUIDE.md) is the short index of all three.

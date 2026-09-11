@@ -106,4 +106,4 @@ sudo ls /var/log/spe-audit                                      # current/ plus 
 sudo zcat /var/log/spe-audit/*/network.*.log.gz | jq -r '[(.ts|todate), .["id.resp_h"], .["id.resp_p"], .conn_state] | @tsv'
 ~~~
 
-zeek only knows addresses and ports. it does not know which process or which user made the connection, and it logs IPs, not hostnames. matching a connection to a command is done by time against the auditd log, which is what [AUDIT-LOG-GUIDE.md](../AUDIT-LOG-GUIDE.md) walks through.
+zeek only knows addresses and ports. it does not know which process or which user made the connection, and it logs IPs, not hostnames. matching a connection to a command is done by time against the auditd log described in [auditd/README.md](../auditd/README.md): same `ses` and `auid` on the command, a network line a moment later.

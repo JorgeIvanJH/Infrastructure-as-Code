@@ -11,7 +11,10 @@ The new goal is:
 
 This lesson does not repeat how XFCE, Guacamole, JupyterLab, RStudio, the
 heartbeat, internet control, or auditing work. Lesson 5 explains those
-components. Here I focus on the multicloud boundary.
+components. Here I focus on the multicloud boundary. For the intuition behind
+the runtime design, where the SPE's name comes from, why the heartbeat survives
+sealed mode, where the records land, and who may do what, read
+[HOW-THE-SPE-WORKS.md](HOW-THE-SPE-WORKS.md).
 
 ~~~text
                          shared files and setup scripts
@@ -407,9 +410,10 @@ as in Lesson 5. Exercise `spe-internet off` and `on`, create a short HTTPS
 connection, inspect both audit logs, and reboot. The acceptance test is equal
 behavior, not identical cloud IDs or background log events.
 
-The detailed application and audit-log instructions remain in Lesson 5 and in
-`files/logging/AUDIT-LOG-GUIDE.md`. How each stream is produced, stored, and
-rotated is explained in the README of its own folder under `files/logging/`.
+The detailed application instructions remain in Lesson 5. How each log stream
+is produced, stored, rotated, and read is explained in the README of its own
+folder under `files/logging/`; `files/logging/AUDIT-LOG-GUIDE.md` is the short
+index of those folders.
 
 ## 10. Change hardware without changing the SPE recipe
 
