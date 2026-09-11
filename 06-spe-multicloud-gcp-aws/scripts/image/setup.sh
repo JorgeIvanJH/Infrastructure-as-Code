@@ -52,6 +52,12 @@ sudo install -o root -g root -m 0644 \
 sudo install -o root -g root -m 0644 \
   /tmp/spe-monitoring-agent.service \
   /etc/systemd/system/spe-monitoring-agent.service
+# The agent's document can be longer than the 48 KiB journald allows per stream
+# line, which would leave two halves in the journal. Raise the limit.
+sudo install -d -o root -g root -m 0755 /etc/systemd/journald.conf.d
+sudo install -o root -g root -m 0644 \
+  /tmp/spe-monitoring-agent-journald.conf \
+  /etc/systemd/journald.conf.d/spe-monitoring-agent.conf
 # The identity step runs at boot as root, reads what Terraform attached to the
 # instance, and writes /etc/spe/identity.env for the agent. Nothing about a
 # specific SPE is written into the image.
@@ -65,6 +71,7 @@ sudo install -o root -g root -m 0644 \
 sudo rm -f \
   /tmp/spe-monitoring-agent.py \
   /tmp/spe-monitoring-agent.service \
+  /tmp/spe-monitoring-agent-journald.conf \
   /tmp/spe-identity \
   /tmp/spe-identity.service
 
@@ -78,6 +85,20 @@ bash -n /usr/local/sbin/spe-identity
 sudo python3 -m py_compile /opt/spe-agent/spe-monitoring-agent.py
 sudo rm -rf /opt/spe-agent/__pycache__
 sudo systemctl enable spe-identity.service spe-monitoring-agent.service
+
+# Prove the journal keeps a long line whole: restart journald with the drop-in,
+# send a 200,000-byte line through the same stream path the agent uses, and
+# read it back at full length.
+systemd-analyze cat-config systemd/journald.conf | grep -qx 'LineMax=16M'
+sudo systemctl restart systemd-journald.service
+head -c 200000 /dev/zero | tr '\0' 'a' | systemd-cat -t spe-linemax-check
+for attempt in {1..10}; do
+  if sudo journalctl -t spe-linemax-check -o cat --no-pager | awk '{ print length($0) }' | grep -qx 200000; then
+    break
+  fi
+  sleep 1
+done
+sudo journalctl -t spe-linemax-check -o cat --no-pager | awk '{ print length($0) }' | grep -qx 200000
 
 # Verify the main packages and both services before Packer saves the image.
 python3 --version

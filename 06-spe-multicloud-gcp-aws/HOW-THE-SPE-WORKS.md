@@ -69,8 +69,8 @@ flowchart TB
 ~~~
 
 Now the heartbeat. It is easy to picture it as a message sent to a control
-plane, but in this lesson **it is not sent anywhere**. Every interval the agent
-prints one JSON line, and systemd stores that line in the VM's own journal. A
+plane, but in this lesson **it is not sent anywhere yet**. Every interval the
+agent prints one JSON document, and systemd stores it in the VM's own journal. A
 local write cannot be blocked by an outbound firewall, so the heartbeat keeps
 going with the internet off.
 
@@ -83,10 +83,10 @@ sequenceDiagram
         A->>W: TCP handshake to 1.1.1.1:443 (no data, no DNS)
         alt internet on
             W-->>A: handshake completes
-            A->>J: {"spe_id":..., "internet":"reachable"}
+            A->>J: {"spe_id":..., "internet":"reachable", "os":[...], "net":[...]}
         else sealed
             Note over W: SYN dropped before it reaches the interface
-            A->>J: {"spe_id":..., "internet":"blocked"}
+            A->>J: {"spe_id":..., "internet":"blocked", "os":[...], "net":[...]}
         end
     end
 ~~~
@@ -114,14 +114,18 @@ Files: [spe-internet](files/internet-control/spe-internet),
 
 ## 3. Where the records live
 
-Three streams, three places, all on the VM's own disk. Nothing leaves the VM.
+Three streams, three places, all on the VM's own disk. Nothing leaves the VM
+yet. The third stream now reads the first two: every interval the agent picks up
+what auditd and Zeek wrote since the last time and puts it into its own
+document, so the journal holds one JSON object per interval with the SPE's name,
+the internet check, an `os` array and a `net` array.
 
 ~~~mermaid
 flowchart LR
     subgraph producers
         P1["a human runs a program<br>logs in, types in a terminal"]
         P2["a packet crosses<br>the network interface"]
-        P3["the agent prints<br>one line per interval"]
+        P3["the agent, once per interval"]
     end
     subgraph writers
         W1["auditd<br>as root"]
@@ -129,27 +133,29 @@ flowchart LR
         W3["journald<br>as root"]
     end
     subgraph disk["on the VM"]
-        F1["/var/log/audit/audit.log<br>raw text, 10 MB x 5 files"]
+        F1["/var/log/audit/audit.log<br>raw text, 10 MB x 5 files<br>0640 root:terraform"]
         F2["/var/log/spe-audit/current/network.log<br>JSON lines, this hour<br>/var/log/spe-audit/YYYY-MM-DD/*.log.gz<br>hourly archives, kept 7 days"]
-        F3["systemd journal<br>journalctl -u spe-monitoring-agent"]
+        F3["systemd journal<br>one document per interval<br>spe_id, internet, os[], net[]"]
     end
     P1 --> W1 --> F1
     P2 --> W2 --> F2
+    F1 -- "read as terraform,<br>from the last bookmark" --> P3
+    F2 -- "read as terraform,<br>from the last bookmark" --> P3
     P3 --> W3 --> F3
 ~~~
 
 | stream | path on the VM | owner and mode | read with |
 |---|---|---|---|
-| operating system: logins, keystrokes, programs started | `/var/log/audit/audit.log` | `root`, `0600` | `sudo ausearch -k spe_cli -i --start recent`, `sudo aureport -l -i`, `sudo aureport --tty -i` |
-| network: one line per connection | `/var/log/spe-audit/network.jsonl` (a link to `current/network.log`), archives under `/var/log/spe-audit/YYYY-MM-DD/` | `spe-netaudit`, `0750` directory | `sudo tail /var/log/spe-audit/network.jsonl \| jq .` |
-| heartbeat: alive, and is the internet reachable | the systemd journal | `root` | `sudo journalctl -u spe-monitoring-agent -f` |
+| operating system: logins, keystrokes, programs started | `/var/log/audit/audit.log` | `root:terraform`, `0640` | `sudo ausearch -k spe_cli -i --start recent`, `sudo aureport -l -i`, `sudo aureport --tty -i` |
+| network: one line per connection | `/var/log/spe-audit/network.jsonl` (a link to `current/network.log`), archives under `/var/log/spe-audit/YYYY-MM-DD/` | `spe-netaudit`, `0750` directory, `terraform` is in the group | `sudo tail /var/log/spe-audit/network.jsonl \| jq .` |
+| heartbeat: alive, is the internet reachable, and the new records of the other two | the systemd journal | `root` | `sudo journalctl -u spe-monitoring-agent -o cat -n 1 \| jq .` |
 
 Only the operating-system stream and the network stream are audit evidence. The
-heartbeat is the only one that already carries the SPE's name in every line;
-the other two would get it from `/etc/spe/identity.env` at export time. How each
-one is produced, rotated, and read is in the README of its folder under
-[files/logging/](files/logging/), indexed by
-[files/logging/AUDIT-LOG-GUIDE.md](files/logging/AUDIT-LOG-GUIDE.md).
+heartbeat carries the SPE's name in every document, and now carries the other
+two streams with it, shaped down to their essential fields. The shape of the
+document is in [files/logging/README.md](files/logging/README.md); how each
+stream is produced, rotated, and read is in the README of its folder under
+[files/logging/](files/logging/).
 
 ## 4. Who may do what
 
@@ -188,12 +194,12 @@ inside the desktop and the home folder.
 | seal or open the internet | yes, `sudo spe-internet off` / `on` | no; the command needs root | no | yes |
 | affected by sealed mode | yes, like everyone | yes | yes | yes, except the metadata API and time |
 | metadata API on `169.254.169.254:80` | allowed | refused at once | refused | allowed |
-| read `/var/log/audit/audit.log` | with `sudo` | no | no | yes |
-| read `/var/log/spe-audit` | with `sudo` | no | yes, owns it | yes |
+| read `/var/log/audit/audit.log` | yes, the file is written for its group so the agent can read it | no | no | yes |
+| read `/var/log/spe-audit` | yes, member of the `spe-netaudit` group for the same reason | no | yes, owns it | yes |
 | read the heartbeat journal | with `sudo` | no | no | yes |
 | change or delete the logs | with `sudo`, and that is the known limit of a local design | no | zeek's own files only | yes |
 | what gets audited | every program started, every keystroke in a terminal, every login, `sudo` included | the same | nothing; system account, `auid` unset | nothing by itself; root shells reached through `sudo` keep the admin's `auid` |
-| runs | the heartbeat agent, as a normal unprivileged process | JupyterLab and RStudio, as itself | zeek, with only the two capabilities packet capture needs | everything else |
+| runs | the heartbeat agent, as a normal unprivileged process that reads both logs through its groups, no `sudo` | JupyterLab and RStudio, as itself | zeek, with only the two capabilities packet capture needs | everything else |
 
 Two points that are easy to miss:
 

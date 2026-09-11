@@ -6,7 +6,7 @@ the kernel generates an event whenever one of three things happens:
 - a program like `sshd`, `sudo`, or `xrdp` opens or closes a session through PAM. these login, logout, and credential events (`USER_LOGIN`, `USER_START`, `USER_END`, `CRED_ACQ`, ...) are hard-wired: they are always sent when auditing is on, so no rule is needed for them.
 - a terminal session has TTY auditing switched on. [spe-tty-audit](spe-tty-audit) does that for every session PAM opens, including root shells reached through `sudo`, so what users type or paste into a terminal is recorded, shell built-ins like `cd` included. `log_passwd` is left out, so anything typed while echo is off (password prompts) is not captured.
 
-then these events are sent to auditd, the writer, which stores them in a physical file, `/var/log/audit/audit.log`, in a raw text format we can parse (more on that below). how that file behaves is configured in [auditd.conf](auditd.conf), a copy of the stock ubuntu 24.04 file where we changed three keys: rotate at 10 MB (`max_log_file`), keep 5 files (`num_logs`), and rotate instead of stopping when the limit is reached (`max_log_file_action = ROTATE`). everything else, including `log_format = ENRICHED` and `log_group = root`, is the distribution default.
+then these events are sent to auditd, the writer, which stores them in a physical file, `/var/log/audit/audit.log`, in a raw text format we can parse (more on that below). how that file behaves is configured in [auditd.conf](auditd.conf), a copy of the stock ubuntu 24.04 file where we changed four keys: rotate at 10 MB (`max_log_file`), keep 5 files (`num_logs`), rotate instead of stopping when the limit is reached (`max_log_file_action = ROTATE`), and let the `terraform` group read the log (`log_group = terraform`), because the heartbeat agent runs as `terraform` and reads this file itself every interval, see [heartbeat/README.md](../heartbeat/README.md). everything else, including `log_format = ENRICHED`, is the distribution default.
 
 ~~~mermaid
 flowchart LR
@@ -18,8 +18,8 @@ flowchart LR
     K["kernel audit subsystem<br>decides what to record"]
     A["auditd daemon<br>writes it down"]
     C["auditd.conf<br>10 MB x 5 files, ROTATE, ENRICHED"]
-    L["/var/log/audit/audit.log<br>raw text, several lines per event<br>0600 root:root"]
-    S["ausearch / aureport<br>group the lines, decode the hex"]
+    L["/var/log/audit/audit.log<br>raw text, several lines per event<br>0640 root:terraform"]
+    S["ausearch / aureport<br>group the lines, decode the hex<br>the heartbeat agent uses ausearch too"]
     R --> K
     P --> K
     T --> K
@@ -104,4 +104,4 @@ sudo aureport -l -i --start recent             # logins
 sudo aureport --tty -i --start recent          # what was typed
 ~~~
 
-the file is `0600 root:root`, so all of this needs `sudo`. one trap: when its stdin is a pipe, as in a cron job, a systemd unit, or the packer build, `ausearch` reads events from stdin instead of the log and answers `<no matches>`. add `--input-logs` there to force the log files; typed at an ssh prompt it is not needed.
+the file is `0640 root:terraform`, so `terraform` can read it without `sudo` (ausearch then prints a one-line note about using the built-in log path, because `auditd.conf` itself is still root only). `sudo` is kept in the commands above out of habit and because `speuser` has no other way in. one trap: when its stdin is a pipe, as in a cron job, a systemd unit, or the packer build, `ausearch` reads events from stdin instead of the log and answers `<no matches>`. add `--input-logs` there to force the log files; typed at an ssh prompt it is not needed.

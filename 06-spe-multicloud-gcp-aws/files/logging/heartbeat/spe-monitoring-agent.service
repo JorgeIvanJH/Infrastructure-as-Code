@@ -3,13 +3,22 @@ Description=SPE monitoring agent
 # The agent needs the identity spe-identity read from instance metadata. If
 # that step failed there is no heartbeat, rather than one with made-up values.
 Requires=spe-identity.service
-After=spe-identity.service
+# The two log producers should be up before the first document is built. They
+# are not Requires= on purpose: if one of them is down, the document still
+# goes out, with that array empty, and says so by its absence.
+After=spe-identity.service auditd.service zeek.service
 
 [Service]
 Type=simple
+# terraform reads the auditd log through log_group in auditd.conf and the Zeek
+# logs through the spe-netaudit group, both set up by setup-auditing.sh.
 User=terraform
 Group=terraform
 EnvironmentFile=/etc/spe/identity.env
+# /var/lib/spe-monitoring-agent, owned by terraform, holds the bookmarks
+# (sequence, auditd checkpoint, Zeek cursor). systemd passes its path in
+# STATE_DIRECTORY.
+StateDirectory=spe-monitoring-agent
 ExecStart=/usr/bin/python3 -u /opt/spe-agent/spe-monitoring-agent.py
 StandardOutput=journal
 StandardError=journal

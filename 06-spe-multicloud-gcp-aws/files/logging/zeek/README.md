@@ -55,7 +55,7 @@ ZeekControl loads zeek's full default script set, so protocol recognition is on.
 | `zeek.service` | `/etc/systemd/system/zeek.service` | `zeekctl deploy` / `zeekctl stop`, sandboxed, as `spe-netaudit` |
 | `zeek-cron.service`, `zeek-cron.timer` | `/etc/systemd/system/` | `zeekctl cron` every five minutes: restarts a crashed node, deletes expired archives |
 
-all installed by [setup-auditing.sh](../../../scripts/image/setup-auditing.sh). ZeekControl's run-time data lives in `/opt/zeek/spool`, owned by `spe-netaudit`. the live log is `/var/log/spe-audit/current/network.log` (`current` is a symlink ZeekControl keeps into the spool), and every hour it is moved, gzipped, to `/var/log/spe-audit/YYYY-MM-DD/network.HH:MM:SS-HH:MM:SS.log.gz`. the `network.jsonl` symlink points at the live file. reading any of it needs `sudo`.
+all installed by [setup-auditing.sh](../../../scripts/image/setup-auditing.sh). ZeekControl's run-time data lives in `/opt/zeek/spool`, owned by `spe-netaudit`. the live log is `/var/log/spe-audit/current/network.log` (`current` is a symlink ZeekControl keeps into the spool), and every hour it is moved, gzipped, to `/var/log/spe-audit/YYYY-MM-DD/network.HH:MM:SS-HH:MM:SS.log.gz`. the `network.jsonl` symlink points at the live file. the directory is `0750`, so reading it takes `sudo` or membership of the `spe-netaudit` group. `terraform` is a member, because the heartbeat agent runs as `terraform` and reads the live file and the archives itself every interval, see [heartbeat/README.md](../heartbeat/README.md).
 
 # most relevant raw Zeek outputs
 

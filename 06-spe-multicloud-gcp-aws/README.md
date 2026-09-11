@@ -402,8 +402,14 @@ sudo systemctl is-enabled xrdp spe-monitoring-agent auditd zeek zeek-cron.timer
 sudo spe-internet status
 sudo tail -n 1 /var/log/audit/audit.log
 sudo tail -n 1 /var/log/spe-audit/network.jsonl | jq .
+sudo journalctl -u spe-monitoring-agent -o cat -n 1 | jq '{spe_id, sequence, internet, os: (.os | length), net: (.net | length)}'
 find ~/spe-data-lab -maxdepth 2 -type f | sort
 ~~~
+
+The `journalctl` line shows the last heartbeat document: the SPE id Terraform
+attached, how many operating-system events and network connections the agent
+collected in that interval, and whether the internet was reachable. The
+commands typed in this very check appear in the next document's `os` array.
 
 Then use the graphical desktop to open the Jupyter notebook and RStudio project
 as in Lesson 5. Exercise `spe-internet off` and `on`, create a short HTTPS
@@ -412,7 +418,7 @@ behavior, not identical cloud IDs or background log events.
 
 The detailed application instructions remain in Lesson 5. How each log stream
 is produced, stored, rotated, and read is explained in the README of its own
-folder under `files/logging/`; `files/logging/AUDIT-LOG-GUIDE.md` is the short
+folder under `files/logging/`; `files/logging/README.md` is the short
 index of those folders.
 
 ## 10. Change hardware without changing the SPE recipe

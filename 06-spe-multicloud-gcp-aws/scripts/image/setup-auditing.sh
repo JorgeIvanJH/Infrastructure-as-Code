@@ -27,10 +27,14 @@ if ! id spe-netaudit >/dev/null 2>&1; then
     --shell /usr/sbin/nologin spe-netaudit
 fi
 sudo install -d -o spe-netaudit -g spe-netaudit -m 0750 /var/log/spe-audit
+# The monitoring agent runs as terraform and reads the Zeek logs through this
+# group. The auditd log is opened to the same account by log_group below.
+sudo usermod --append --groups spe-netaudit terraform
 
 # Configure Linux Audit and terminal input auditing. auditd keeps its own log
 # at /var/log/audit/audit.log; the shipped auditd.conf bounds it to five files
-# of 10 MB and otherwise matches the distribution default.
+# of 10 MB, lets the terraform group read it, and otherwise matches the
+# distribution default.
 sudo install -o root -g root -m 0640 \
   /tmp/50-spe.rules \
   /etc/audit/rules.d/50-spe.rules
@@ -98,6 +102,8 @@ sudo auditctl -l | grep -F spe_cli >/dev/null
 sudo grep -Eq '^max_log_file = 10$' /etc/audit/auditd.conf
 sudo grep -Eq '^num_logs = 5$' /etc/audit/auditd.conf
 sudo grep -Eq '^max_log_file_action = ROTATE$' /etc/audit/auditd.conf
+sudo grep -Eq '^log_group = terraform$' /etc/audit/auditd.conf
+id --name --groups terraform | grep -qw spe-netaudit
 grep -Fxq '@include spe-tty-audit' /etc/pam.d/common-session
 sudo systemd-analyze verify \
   /etc/systemd/system/zeek.service \
@@ -177,8 +183,21 @@ fi
 # stdin is a pipe, as it is under Packer, ausearch reads events from there
 # instead of the log; --input-logs forces the log files from auditd.conf.
 sudo ausearch --input-logs -k spe_cli >/dev/null
-sudo find /var/log/spe-audit -name 'network.*.log.gz' -exec zcat {} + \
-  | tail -n 1 | jq --exit-status . >/dev/null
+
+# The monitoring agent must be able to do the same as terraform, without sudo:
+# auditd wrote its log for the terraform group, and the Zeek archive is group
+# readable. Build one document without moving any bookmark and check that it
+# holds the curl command above under "os" and the test connection under "net".
+sudo -u terraform test -r /var/log/audit/audit.log
+sudo -u terraform env SPE_ID=build-check SPE_HEARTBEAT_INTERVAL=5 \
+  python3 /opt/spe-agent/spe-monitoring-agent.py --once > /tmp/spe-document.json
+jq --exit-status '.os | map(select(.kind == "command" and .args[0] == "curl")) | length > 0' \
+  /tmp/spe-document.json >/dev/null
+jq --exit-status '.net | map(select(.dst_port == 443)) | length > 0' \
+  /tmp/spe-document.json >/dev/null
+jq --compact-output '{spe_id, sequence, internet, os: (.os | length), net: (.net | length)}' \
+  /tmp/spe-document.json
+rm -f /tmp/spe-document.json
 
 # The build VM's own traffic is not evidence for any SPE. Remove the archived
 # build logs; the node is left stopped and starts through its unit on boot.

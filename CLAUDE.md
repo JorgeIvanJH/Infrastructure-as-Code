@@ -123,9 +123,9 @@ resync them to the lesson 05 wording.
 
 In lesson 06, everything that produces telemetry lives under
 [files/logging/](06-spe-multicloud-gcp-aws/files/logging/), split by producer: `auditd/` (rules and
-PAM include), `zeek/` (ZeekControl `node.cfg`, `zeekctl.cfg`, `networks.cfg`, site policy, interface script, units and timer), and `heartbeat/` (agent and
-unit). Each producer folder has a README on how its stream is produced, stored, and read, and
-`AUDIT-LOG-GUIDE.md` at the top of the folder is a one-table index of those subfolders. The rest of `files/` is split the same way: `internet-control/` (the `spe-internet` toggle, its nftables rule files, the metadata access table, and the restore unit) and `desktop/` (the JupyterLab launcher and the two XFCE menu entries). Formerly described as desktop,
+PAM include), `zeek/` (ZeekControl `node.cfg`, `zeekctl.cfg`, `networks.cfg`, site policy, interface script, units and timer), and `heartbeat/` (agent,
+unit, identity script and unit, and a journald drop-in raising `LineMax` so a long document is not cut in two). Each producer folder has a README on how its stream is produced, stored, and read, and
+`README.md` at the top of the folder is a one-table index of those subfolders. The rest of `files/` is split the same way: `internet-control/` (the `spe-internet` toggle, its nftables rule files, the metadata access table, and the restore unit) and `desktop/` (the JupyterLab launcher and the two XFCE menu entries). Formerly described as desktop,
 launchers, and internet control. The build template's upload `source` paths point into these
 subfolders, so a moved file needs a matching edit there.
 
@@ -178,10 +178,19 @@ boot. Audit output is two local files: raw auditd records in `/var/log/audit/aud
 lines per event, and Zeek connection metadata as JSON Lines in `/var/log/spe-audit`. Laurel, which
 used to aggregate the auditd records into JSON, was removed on 2026-09-10 so the two tools can be
 studied on their own; it may return as a design change.
-The README in each producer folder explains how its records are produced, stored, rotated, and read;
-[AUDIT-LOG-GUIDE.md](06-spe-multicloud-gcp-aws/files/logging/AUDIT-LOG-GUIDE.md) is the one-table
-index of those folders. Exporting these streams off the VM is future work with no design document
-yet.
+Since 2026-09-11 the heartbeat agent reads both files itself every interval and prints one JSON
+document with `spe_id`, `boot_id`, `sequence`, `timestamp`, `internet`, an `os` array (auditd
+events shaped to `command`, `session`, `tty`) and a `net` array (ten renamed Zeek fields). It reads
+auditd through `ausearch --checkpoint` and Zeek through an inode-and-offset cursor, keeps its
+bookmarks in `/var/lib/spe-monitoring-agent` (systemd `StateDirectory=`), moves them only after
+printing, and supports `--once` for a no-side-effect document, which the build uses as its proof.
+To make that possible without sudo, `auditd.conf` sets `log_group = terraform` and `terraform` is
+in the `spe-netaudit` group. The document shape and the field-by-field rationale live in
+[README.md](06-spe-multicloud-gcp-aws/files/logging/README.md), which is also the one-table index
+of the producer folders; each producer README explains how its records are produced, stored,
+rotated, and read. Sending the document to a collector over HTTPS is the next step; the rules it
+must follow (fixed IP in the egress allowlist, TLS, bookmarks move only on 2xx, nothing dropped)
+are written in that README.
 
 ## Conventions
 

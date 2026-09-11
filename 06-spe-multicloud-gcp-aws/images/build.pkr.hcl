@@ -24,6 +24,11 @@ build {
   }
 
   provisioner "file" {
+    source      = "../files/logging/heartbeat/spe-monitoring-agent-journald.conf"
+    destination = "/tmp/spe-monitoring-agent-journald.conf"
+  }
+
+  provisioner "file" {
     source      = "../files/logging/heartbeat/spe-identity"
     destination = "/tmp/spe-identity"
   }
